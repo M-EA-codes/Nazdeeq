@@ -1,22 +1,15 @@
 stages:
-  data_preparation:
-    cmd: echo "Data preparation placeholder"
+  prepare:
+    cmd: echo "Data preparation stage"
     deps:
       - ml/data
     outs:
       - ml/data/processed
   
-  feature_engineering:
-    cmd: echo "Feature engineering placeholder"
+  train:
+    cmd: echo "Model training stage"
     deps:
       - ml/data/processed
-    outs:
-      - ml/data/features
-  
-  model_training:
-    cmd: echo "Model training placeholder"
-    deps:
-      - ml/data/features
     outs:
       - ml/models/model.pkl
     metrics:
