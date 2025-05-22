@@ -4,8 +4,20 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
-const app = express();
+const User = require('./models/User');
+const userRoutes = require('./routes/users');
+const groupRoutes = require('./routes/groups');
+const discussionRoutes = require('./routes/discussions');
+const commentRoutes = require('./routes/comments');
+const chatRoutes = require('./routes/chats');
+const messageRoutes = require('./routes/messages');
+const pollRoutes = require('./routes/polls');
+const rideRoutes = require('./routes/rides');
+const rideRequestRoutes = require('./routes/rideRequests');
+const eventRoutes = require('./routes/events');
+const serviceRoutes = require('./routes/services');
+const serviceRequestRoutes = require('./routes/serviceRequests');
+const neighborWorksRoutes = require('./routes/neighborWorks');
 
 // Middleware
 app.use(cors());
@@ -17,21 +29,19 @@ mongoose.connect(process.env.MONGODB_URI, {
   useUnifiedTopology: true
 });
 
-// User Schema
-const userSchema = new mongoose.Schema({
-  fullName: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  phoneNumber: { type: String, required: true },
-  password: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now }
-});
-
-const User = mongoose.model('User', userSchema);
-
 // Authentication Routes
 app.post('/api/register', async (req, res) => {
   try {
-    const { fullName, email, phoneNumber, password } = req.body;
+    // Align fields with User.js model
+    const {
+      fullName,
+      email,
+      phoneNumber,
+      password,
+      address,
+      roles,
+      serviceCategories
+    } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -42,12 +52,18 @@ app.post('/api/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create new user
+    // Create new user with fields as per User.js model
     const user = new User({
       fullName,
       email,
       phoneNumber,
-      password: hashedPassword
+      password: hashedPassword,
+      address: address || '',
+      roles: roles || { serviceSeeker: true, serviceProvider: false },
+      serviceCategories: serviceCategories || [],
+      rating: 0,
+      completedOrders: 0,
+      reviews: []
     });
 
     await user.save();
@@ -67,9 +83,10 @@ app.post('/api/register', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
   try {
+    // Align fields with User.js model
     const { email, password } = req.body;
 
-    // Find user
+    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -94,7 +111,22 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.use('/api/neighbor-works', neighborWorksRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/discussions', discussionRoutes);
+app.use('/api/comments', commentRoutes);
+app.use('/api/chats', chatRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/polls', pollRoutes);
+app.use('/api/rides', rideRoutes);
+app.use('/api/ride-requests', rideRequestRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/service-requests', serviceRequestRoutes);
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
+  console.log('Mongo URI:', process.env.MONGODB_URI);
+  console.log('API URL:', process.env.API_URL);
   console.log(`Server running on port ${PORT}`);
 });

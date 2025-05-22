@@ -1,16 +1,16 @@
-// Configuration utility to access environment variables
+// React Native compatible configuration
+// This file provides configuration values without using Node.js modules
+
 const config = {
   // API URL for server communication
-  API_URL: process.env.API_URL || 'http://127.0.0.1:5000/api',
+  API_URL: 'http://172.17.120.149:5000/api',
   
   // JWT Secret for token generation and verification
-  JWT_SECRET: process.env.JWT_SECRET || 'nazdeeq_secure_jwt_secret_key',
+  JWT_SECRET: 'nazdeeq_secure_jwt_secret_key',
   
-  // MongoDB connection string
-  MONGODB_URI: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/nazdeeq',
+  // MongoDB connection string (only used on server side)
+  MONGODB_URI: 'mongodb://127.0.0.1:27017/nazdeeq',
   
   // Server port
-  PORT: process.env.PORT || 5000
-};
-
-module.exports = config;
+  PORT: 5000
+}; module.exports = config;

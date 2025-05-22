@@ -36,10 +36,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="marketplace"
+        name="neighborWorks"
         options={{
-          title: 'Marketplace',
-          tabBarIcon: ({ color }) => <IconSymbol name="cart.fill" color={color} size={24} />,
+          title: 'NeighborWorks',
+          tabBarIcon: ({ color }) => <IconSymbol name="wrench.and.screwdriver.fill" color={color} size={24} />,
         }}
       />
       <Tabs.Screen
