@@ -151,6 +151,7 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.quickActionButton}>
             <IconSymbol name="house.fill" size={24} color="#fff" />
             <ThemedText style={styles.quickActionText}>Neighborworks</ThemedText>
+            router.replace('neighborWorks/Dashboard');
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.quickActionButton}>

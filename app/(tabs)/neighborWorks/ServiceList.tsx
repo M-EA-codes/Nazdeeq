@@ -1,27 +1,43 @@
-import React from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { ThemedText } from '../../../components/ThemedText';
 import { ThemedView } from '../../../components/ThemedView';
 
-const mockServices = [
-  { id: '1', title: 'Plumbing', provider: 'Ali Khan', rating: 4.8 },
-  { id: '2', title: 'Electrician', provider: 'Sara Ahmed', rating: 4.6 },
-  { id: '3', title: 'Gardening', provider: 'Bilal Raza', rating: 4.9 },
-];
+export default function ServiceListScreen({ navigation }: { navigation: { navigate: (screen: string, params?: any) => void } }) {
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-export default function ServiceListScreen() {
+  useEffect(() => {
+    fetch('http://localhost:5000/api/neighbor-works/services')
+      .then(res => res.json())
+      .then(data => {
+        setServices(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <ThemedView style={styles.container}>
+        <ActivityIndicator size="large" color="#3b5998" />
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="title" style={styles.header}>Neighbor Works Services</ThemedText>
       <FlatList
-        data={mockServices}
-        keyExtractor={item => item.id}
+        data={services}
+        keyExtractor={(item: any) => item._id}
         renderItem={({ item }) => (
-          <View style={styles.card}>
-            <ThemedText type="subtitle">{item.title}</ThemedText>
-            <ThemedText>Provider: {item.provider}</ThemedText>
-            <ThemedText>Rating: {item.rating} ⭐</ThemedText>
-          </View>
+          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('ProviderProfile', { provider: item.provider })}>
+            <ThemedText type="subtitle">{item.category}</ThemedText>
+            <ThemedText>Provider: {item.provider.fullName}</ThemedText>
+            <ThemedText>Rating: {item.provider.rating} ⭐</ThemedText>
+            <ThemedText>Verified: {item.provider.verified ? 'Yes' : 'No'}</ThemedText>
+          </TouchableOpacity>
         )}
         contentContainerStyle={styles.list}
       />

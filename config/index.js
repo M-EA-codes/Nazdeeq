@@ -3,7 +3,7 @@
 
 const config = {
   // API URL for server communication
-  API_URL: 'http://172.17.120.149:5000/api',
+  API_URL: 'http://192.168.100.64:5000/api',
   
   // JWT Secret for token generation and verification
   JWT_SECRET: 'nazdeeq_secure_jwt_secret_key',

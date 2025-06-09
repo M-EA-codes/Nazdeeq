@@ -20,6 +20,7 @@ const serviceRequestRoutes = require('./routes/serviceRequests');
 const neighborWorksRoutes = require('./routes/neighborWorks');
 
 // Middleware
+const app = express();
 app.use(cors());
 app.use(express.json());
 
