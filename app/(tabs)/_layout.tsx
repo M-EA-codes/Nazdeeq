@@ -43,6 +43,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="neighborCommute"
+        options={{
+          title: 'NeighborCommute',
+          tabBarIcon: ({ color }) => <IconSymbol name="car.fill" color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
