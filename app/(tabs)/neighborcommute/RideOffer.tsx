@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import api from '../../api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function RideOffer() {
   const [origin, setOrigin] = useState('');
@@ -8,14 +10,42 @@ export default function RideOffer() {
   const [seats, setSeats] = useState('');
   const [notes, setNotes] = useState('');
 
-  const handleOfferRide = () => {
-    // TODO: Add backend integration
-    Alert.alert('Ride Offered', 'Your ride offer has been submitted!');
-    setOrigin('');
-    setDestination('');
-    setDateTime('');
-    setSeats('');
-    setNotes('');
+  const handleOfferRide = async () => {
+    if (!origin || !destination || !dateTime || !seats) {
+      Alert.alert('Missing Fields', 'Please fill in all required fields.');
+      return;
+    }
+    try {
+      // Optionally get userId from AsyncStorage if you want to associate the ride with a user
+      let driverId = null;
+      try {
+        const prefs = await AsyncStorage.getItem('userPreferences');
+        if (prefs) {
+          const parsed = JSON.parse(prefs);
+          driverId = parsed.userId;
+        }
+      } catch {}
+      const rideData = {
+        driverId, // can be null if not logged in
+        origin: { name: origin },
+        destination: { name: destination },
+        dateTime: new Date(dateTime),
+        seatsAvailable: Number(seats),
+        fare: 0, // or add a fare input if needed
+        status: 'open',
+        notes,
+      };
+      await api.post('/rides', rideData);
+      Alert.alert('Ride Offered', 'Your ride offer has been submitted!');
+      setOrigin('');
+      setDestination('');
+      setDateTime('');
+      setSeats('');
+      setNotes('');
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to submit ride offer.');
+    }
   };
 
   return (
