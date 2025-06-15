@@ -32,7 +32,7 @@ export default function RideDiscovery() {
 		setTimeout(() => setLoading(false), 1000);
 	};
 
-	const renderRide = ({ item }) => (
+	const renderRide = ({ item }: { item: typeof dummyRides[0] }) => (
 		<View style={styles.card}>
 			<View style={styles.cardHeader}>
 				<Text style={styles.driverName}>{item.driver.name}</Text>

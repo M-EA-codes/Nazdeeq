@@ -1,17 +1,111 @@
-import React from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLocalSearchParams } from 'expo-router';
+import config from '@/config';
 
 export default function ProfileScreen() {
+  const { onboarding } = useLocalSearchParams();
   const handleLogout = async () => {
     await AsyncStorage.removeItem('userToken');
     router.replace('/(auth)/welcome');
   };
 
+  if (onboarding === 'true') {
+    const [serviceCategories, setServiceCategories] = useState<string[]>([]);
+    const [description, setDescription] = useState('');
+    const [address, setAddress] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
+    const [error, setError] = useState('');
+    const allServices = ['Electrician', 'Plumber', 'Carpenter', 'Painter', 'Gardener'];
+
+    const handleToggleService = (service: string) => {
+      setServiceCategories(prev =>
+        prev.includes(service)
+          ? prev.filter(s => s !== service)
+          : [...prev, service]
+      );
+    };
+
+    const handleSubmit = async () => {
+      setLoading(true);
+      setError('');
+      setSuccess(false);
+      try {
+        const response = await fetch(`${config.API_URL}/neighbor-works/provider`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            serviceCategories,
+            description,
+            address,
+          }),
+        });
+        if (!response.ok) {
+          throw new Error('Failed to submit provider profile');
+        }
+        setSuccess(true);
+      } catch (err: any) {
+        setError(err.message || 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText style={{ fontSize: 20, marginBottom: 16 }}>Provider Onboarding</ThemedText>
+        <ThemedText>Select Service Categories:</ThemedText>
+        <ThemedView style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+          {allServices.map(service => (
+            <TouchableOpacity
+              key={service}
+              style={{
+                backgroundColor: serviceCategories.includes(service) ? '#4CAF50' : '#E0E0E0',
+                padding: 8,
+                borderRadius: 16,
+                margin: 4,
+              }}
+              onPress={() => handleToggleService(service)}
+            >
+              <ThemedText style={{ color: serviceCategories.includes(service) ? '#fff' : '#333' }}>{service}</ThemedText>
+            </TouchableOpacity>
+          ))}
+        </ThemedView>
+        <ThemedText>Description:</ThemedText>
+        <TextInput
+          style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 12 }}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Describe your services"
+          multiline
+        />
+        <ThemedText>Address:</ThemedText>
+        <TextInput
+          style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 12 }}
+          value={address}
+          onChangeText={setAddress}
+          placeholder="Enter your address"
+        />
+        {error ? <ThemedText style={{ color: 'red', marginBottom: 8 }}>{error}</ThemedText> : null}
+        {success ? <ThemedText style={{ color: 'green', marginBottom: 8 }}>Profile submitted successfully!</ThemedText> : null}
+        <TouchableOpacity
+          style={{ backgroundColor: '#1976D2', padding: 12, borderRadius: 8, alignItems: 'center' }}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>{loading ? 'Submitting...' : 'Submit'}</ThemedText>
+        </TouchableOpacity>
+      </ThemedView>
+    );
+  }
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>

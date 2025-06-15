@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { ThemedText } from '../../../components/ThemedText';
 import { ThemedView } from '../../../components/ThemedView';
+import config from '@/config';
 
 export default function ServiceListScreen({ navigation }: { navigation: { navigate: (screen: string, params?: any) => void } }) {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/neighbor-works/services')
+    fetch(`${config.API_URL}/neighbor-works/services`)
       .then(res => res.json())
       .then(data => {
         setServices(data);
@@ -36,7 +37,16 @@ export default function ServiceListScreen({ navigation }: { navigation: { naviga
             <ThemedText type="subtitle">{item.category}</ThemedText>
             <ThemedText>Provider: {item.provider.fullName}</ThemedText>
             <ThemedText>Rating: {item.provider.rating} ⭐</ThemedText>
-            <ThemedText>Verified: {item.provider.verified ? 'Yes' : 'No'}</ThemedText>
+            <ThemedText>Verified: {item.provider.isVerified ? 'Yes' : 'No'}</ThemedText>
+            {item.priceRange && <ThemedText>Price: {item.priceRange}</ThemedText>}
+            {item.location && <ThemedText>Location: {item.location}</ThemedText>}
+            {item.gallery && item.gallery.length > 0 && (
+              <View style={{ flexDirection: 'row', marginTop: 6 }}>
+                {item.gallery.slice(0, 3).map((img: string, idx: number) => (
+                  <Image key={idx} source={{ uri: img }} style={{ width: 40, height: 40, borderRadius: 8, marginRight: 4 }} />
+                ))}
+              </View>
+            )}
           </TouchableOpacity>
         )}
         contentContainerStyle={styles.list}

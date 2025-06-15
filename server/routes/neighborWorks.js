@@ -68,4 +68,16 @@ router.get('/reviews/:userId', async (req, res) => {
   }
 });
 
+// Get provider details by ID
+router.get('/provider/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password').populate('reviews');
+    if (!user || !user.roles.serviceProvider) {
+      return res.status(404).json({ message: 'Provider not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching provider', error: error.message });
+  }
+});
 module.exports = router;

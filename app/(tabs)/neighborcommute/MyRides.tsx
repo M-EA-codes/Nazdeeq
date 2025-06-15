@@ -26,7 +26,7 @@ const myRides = [
 export default function MyRides() {
   const [rides, setRides] = useState(myRides);
 
-  const renderRide = ({ item }) => (
+  const renderRide = ({ item }: { item: { _id: string; type: string; origin: string; destination: string; dateTime: string; seatsAvailable: number; status: string; } }) => (
     <View style={styles.card}>
       <Text style={styles.type}>{item.type === 'offered' ? 'Offered Ride' : 'Joined Ride'}</Text>
       <Text style={styles.route}>{item.origin} → {item.destination}</Text>
