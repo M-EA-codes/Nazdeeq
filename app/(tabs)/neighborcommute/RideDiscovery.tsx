@@ -1,131 +1,229 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Image, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons, FontAwesome5, Ionicons, Feather } from '@expo/vector-icons';
+import api from '../../api';
 
-// Dummy data for UI preview
-const dummyRides = [
-	{
-		_id: '1',
-		driver: { name: 'Ali Raza', trustScore: 92, rating: 4.8 },
-		origin: { name: 'F-11 Markaz' },
-		destination: { name: 'H-9 GIKI Bus Stop' },
-		dateTime: '2025-06-07T08:00:00Z',
-		seatsAvailable: 2,
-		fare: 0,
-		recurrence: ['Mon', 'Tue', 'Wed'],
-		genderPreference: 'female-only',
-		rideNotes: 'Leave sharp at 8 AM',
-	},
-	// ...add more rides as needed
-];
+interface Ride {
+  _id: string;
+  driverId?: { fullName?: string } | string;
+  origin?: { name?: string };
+  destination?: { name?: string };
+  dateTime?: string;
+  seatsAvailable?: number;
+  fare?: number;
+  notes?: string;
+}
 
 export default function RideDiscovery() {
-	const [pickup, setPickup] = useState('');
-	const [dropoff, setDropoff] = useState('');
-	const [date, setDate] = useState('');
-	const [loading, setLoading] = useState(false);
-	const [rides, setRides] = useState(dummyRides);
+  const [pickup, setPickup] = useState('');
+  const [dropoff, setDropoff] = useState('');
+  const [date, setDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [rides, setRides] = useState<Ride[]>([]);
 
-	// Placeholder for search/filter logic
-	const handleSearch = () => {
-		setLoading(true);
-		// TODO: Fetch rides from backend using pickup, dropoff, date
-		setTimeout(() => setLoading(false), 1000);
-	};
+  useEffect(() => {
+    fetchRides();
+  }, []);
 
-	const renderRide = ({ item }) => (
-		<View style={styles.card}>
-			<View style={styles.cardHeader}>
-				<Text style={styles.driverName}>{item.driver.name}</Text>
-				<Text style={styles.trustScore}>Trust: {item.driver.trustScore}</Text>
-				<Text style={styles.rating}>⭐ {item.driver.rating}</Text>
-			</View>
-			<Text style={styles.route}>
-				{item.origin.name} → {item.destination.name}
-			</Text>
-			<Text style={styles.datetime}>{new Date(item.dateTime).toLocaleString()}</Text>
-			<View style={styles.cardRow}>
-				<Text style={styles.seats}>Seats: {item.seatsAvailable}</Text>
-				<Text style={styles.recurrence}>
-					{item.recurrence ? `Recurring: ${item.recurrence.join(', ')}` : ''}
-				</Text>
-				<Text style={styles.fare}>{item.fare === 0 ? 'Free' : `Rs. ${item.fare}`}</Text>
-			</View>
-			<Text style={styles.notes}>{item.rideNotes}</Text>
-			<TouchableOpacity style={styles.joinBtn}>
-				<Text style={styles.joinBtnText}>Join Ride</Text>
-			</TouchableOpacity>
-		</View>
-	);
+  const fetchRides = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/rides');
+      setRides(res.data);
+    } catch (err) {
+      setRides([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-	return (
-		<View style={styles.container}>
-			<Text style={styles.title}>Ride Discovery</Text>
-			<View style={styles.form}>
-				<TextInput
-					style={styles.input}
-					placeholder="Pickup Location"
-					value={pickup}
-					onChangeText={setPickup}
-				/>
-				<TextInput
-					style={styles.input}
-					placeholder="Dropoff Location"
-					value={dropoff}
-					onChangeText={setDropoff}
-				/>
-				<TextInput
-					style={styles.input}
-					placeholder="Departure Date (YYYY-MM-DD)"
-					value={date}
-					onChangeText={setDate}
-				/>
-				<TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
-					<Text style={styles.searchBtnText}>Search</Text>
-				</TouchableOpacity>
-			</View>
-			{loading ? (
-				<ActivityIndicator size="large" color="#3b5998" style={{ marginTop: 20 }} />
-			) : (
-				<FlatList
-					data={rides}
-					keyExtractor={item => item._id}
-					renderItem={renderRide}
-					contentContainerStyle={{ paddingBottom: 40 }}
-					ListEmptyComponent={
-						<Text style={{ textAlign: 'center', marginTop: 30 }}>No rides found.</Text>
-					}
-				/>
-			)}
-		</View>
-	);
+  const handleSearch = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/rides');
+      let filtered: Ride[] = res.data;
+      if (pickup) filtered = filtered.filter((r: Ride) => r.origin?.name?.toLowerCase().includes(pickup.toLowerCase()));
+      if (dropoff) filtered = filtered.filter((r: Ride) => r.destination?.name?.toLowerCase().includes(dropoff.toLowerCase()));
+      if (date) filtered = filtered.filter((r: Ride) => r.dateTime?.startsWith(date));
+      setRides(filtered);
+    } catch (err) {
+      setRides([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderRide = ({ item }: { item: Ride }) => (
+    <View style={styles.rideCardWhite}>
+      <View style={styles.rideCardRow}>
+        <Image
+          source={require('../../assets/images/profile-placeholder.png')}
+          style={styles.profilePic}
+        />
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <MaterialIcons name="location-on" size={18} color="#3ad29f" />
+            <Text style={styles.rideTitleBlack}>{item.origin?.name || 'FAST NUCES'}</Text>
+            <View style={styles.trustBadge}><Text style={styles.trustBadgeText}>90</Text></View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+            <MaterialIcons name="location-on" size={16} color="#3a8fd2" />
+            <Text style={styles.rideSubtitleBlack}>{item.destination?.name || 'Media Town'}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+            <MaterialIcons name="calendar-today" size={15} color="#7f53ac" />
+            <Text style={styles.rideDateBlack}>{item.dateTime ? new Date(item.dateTime).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Jun 7, 2025 - 11:00 AM'}</Text>
+          </View>
+        </View>
+      </View>
+      <View style={styles.rideDetailsRow}>
+        <View style={styles.rideDetailItem}>
+          <FontAwesome5 name="user-friends" size={16} color="#3a8fd2" />
+          <Text style={styles.rideDetailTextBlack}>1 seat</Text>
+        </View>
+        <View style={styles.rideDetailItem}>
+          <MaterialIcons name="access-time" size={16} color="#7f53ac" />
+          <Text style={styles.rideDetailTextBlack}>15 min</Text>
+        </View>
+        <View style={styles.rideDetailItem}>
+          <MaterialIcons name="attach-money" size={16} color="#3ad29f" />
+          <Text style={styles.rideDetailTextFree}>FREE</Text>
+        </View>
+      </View>
+      <TouchableOpacity style={styles.joinBtnCard}>
+        <Text style={styles.joinText}>JOIN RIDE</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <LinearGradient colors={["#23235b", "#6d3fd4"]} style={styles.gradient}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+          {/* Top Bar */}
+          <View style={styles.topBar}>
+            <TouchableOpacity style={styles.backBtn}>
+              <Ionicons name="arrow-back" size={28} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.title}>Ride Discovery</Text>
+          </View>
+
+          {/* Search Form */}
+          <LinearGradient colors={["#6d3fd4", "#8f5cff"]} style={styles.formCard}>
+            <View style={styles.inputRow}>
+              <MaterialIcons name="location-pin" size={22} color="#3ad29f" />
+              <TextInput
+                style={styles.input}
+                placeholder="Pickup location"
+                placeholderTextColor="#bbb"
+                value={pickup}
+                onChangeText={setPickup}
+              />
+            </View>
+            <View style={styles.inputRow}>
+              <MaterialIcons name="location-pin" size={22} color="#3a8fd2" />
+              <TextInput
+                style={styles.input}
+                placeholder="Dropoff location"
+                placeholderTextColor="#bbb"
+                value={dropoff}
+                onChangeText={setDropoff}
+              />
+            </View>
+            <View style={styles.inputRow}>
+              <Feather name="calendar" size={20} color="#fff" />
+              <TextInput
+                style={styles.input}
+                placeholder="Departure (YYYY-MM-DD)"
+                placeholderTextColor="#bbb"
+                value={date}
+                onChangeText={setDate}
+              />
+            </View>
+            <TouchableOpacity style={styles.searchBtn} onPress={handleSearch}>
+              <Text style={styles.searchBtnText}>SEARCH</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+
+          {/* Ride Results */}
+          {loading ? (
+            <ActivityIndicator size="large" color="#fff" style={{ marginTop: 20 }} />
+          ) : (
+            <FlatList
+              data={rides}
+              keyExtractor={item => item._id}
+              renderItem={renderRide}
+              contentContainerStyle={{ paddingBottom: 100 }}
+              ListEmptyComponent={
+                <Text style={{ textAlign: 'center', marginTop: 30, color: '#fff', fontWeight: 'bold' }}>No rides found.</Text>
+              }
+            />
+          )}
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
+  );
 }
 
 const styles = StyleSheet.create({
-	container: { flex: 1, padding: 16, backgroundColor: '#f8f9fa' },
-	title: { fontSize: 22, fontWeight: 'bold', marginBottom: 12, color: '#3b5998' },
-	form: { marginBottom: 18, backgroundColor: '#fff', borderRadius: 8, padding: 12, elevation: 2 },
-	input: {
-		borderWidth: 1,
-		borderColor: '#ddd',
-		borderRadius: 6,
-		padding: 10,
-		marginBottom: 10,
-		backgroundColor: '#f5f5f5',
-	},
-	searchBtn: { backgroundColor: '#3b5998', borderRadius: 6, padding: 12, alignItems: 'center' },
-	searchBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-	card: { backgroundColor: '#fff', borderRadius: 10, padding: 16, marginBottom: 16, elevation: 2 },
-	cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-	driverName: { fontWeight: 'bold', fontSize: 16, color: '#222' },
-	trustScore: { fontSize: 13, color: '#4c669f' },
-	rating: { fontSize: 13, color: '#f4b400' },
-	route: { fontSize: 15, fontWeight: '500', marginBottom: 2 },
-	datetime: { fontSize: 13, color: '#666', marginBottom: 6 },
-	cardRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-	seats: { fontSize: 13, color: '#3b5998' },
-	recurrence: { fontSize: 13, color: '#888' },
-	fare: { fontSize: 13, color: '#388e3c' },
-	notes: { fontSize: 13, color: '#555', fontStyle: 'italic', marginBottom: 8 },
-	joinBtn: { backgroundColor: '#4c669f', borderRadius: 6, padding: 10, alignItems: 'center' },
-	joinBtnText: { color: '#fff', fontWeight: 'bold' },
+  gradient: { flex: 1 },
+  topBar: { flexDirection: 'row', alignItems: 'center', marginTop: 32, marginBottom: 18, paddingHorizontal: 10 },
+  backBtn: { marginRight: 10 },
+  title: { flex: 1, fontSize: 28, fontWeight: 'bold', color: '#fff', textAlign: 'center', letterSpacing: 1 },
+  formCard: { borderRadius: 24, padding: 18, marginHorizontal: 6, marginBottom: 24, elevation: 4, shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
+  inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 50, marginBottom: 14, paddingHorizontal: 16, paddingVertical: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  input: { fontSize: 16, color: '#23235b', marginLeft: 10, flex: 1, fontWeight: '500' },
+  searchBtn: { backgroundColor: '#6d3fd4', borderRadius: 50, padding: 16, alignItems: 'center', marginTop: 8, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+  searchBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 18, letterSpacing: 2 },
+  rideCardWhite: {
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 18,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.13,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: '#fff',
+  },
+  rideCardRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  profilePic: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#eee',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  rideTitleBlack: { fontWeight: 'bold', fontSize: 17, color: '#232323', marginLeft: 4 },
+  trustBadge: {
+    marginLeft: 'auto',
+    backgroundColor: '#7f53ac',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trustBadgeText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  rideSubtitleBlack: { fontSize: 14, color: '#232323', marginLeft: 4 },
+  rideDateBlack: { fontSize: 13, color: '#232323', marginLeft: 4 },
+  rideDetailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, marginBottom: 8 },
+  rideDetailItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rideDetailTextBlack: { fontSize: 13, color: '#232323', marginLeft: 4 },
+  rideDetailTextFree: { fontSize: 13, color: '#3ad29f', fontWeight: 'bold', marginLeft: 4 },
+  joinBtnCard: {
+    backgroundColor: '#4b32c3',
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  joinText: { color: '#fff', fontWeight: 'bold', fontSize: 17, letterSpacing: 1 },
 });

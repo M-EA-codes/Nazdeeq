@@ -43,11 +43,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="neighborCommute"
+        name="neighborcommute"
         options={{
           title: 'NeighborCommute',
           tabBarIcon: ({ color }) => <IconSymbol name="car.fill" color={color} size={24} />,
         }}
+        initialParams={{ screen: 'Dashboard' }}
       />
       <Tabs.Screen
         name="profile"

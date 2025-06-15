@@ -35,6 +35,13 @@ export default function AuthScreen() {
 
       if (response.data.token) {
         await AsyncStorage.setItem('userToken', response.data.token);
+        if (response.data.userId) {
+          // Save userId to userPreferences for later use (e.g., ride offer)
+          let userPreferences = await AsyncStorage.getItem('userPreferences');
+          userPreferences = userPreferences ? JSON.parse(userPreferences) : {};
+          userPreferences.userId = response.data.userId;
+          await AsyncStorage.setItem('userPreferences', JSON.stringify(userPreferences));
+        }
         
         // Check if this is a new user registration
         if (!isLogin) {
