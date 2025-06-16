@@ -7,6 +7,9 @@ import { router } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '@/config';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'react-native';
+
 
 // Use the config API_URL instead of hardcoding it
 const API_URL = config.API_URL;
@@ -18,8 +21,28 @@ export default function AuthScreen() {
     email: '',
     phoneNumber: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    profilePhoto: ''
   });
+  const [imagePreview, setImagePreview] = useState('');
+// Remove this duplicate declaration since error state is already declared below
+
+  const pickProfilePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Permission to access gallery is required!');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setFormData({ ...formData, profilePhoto: result.assets[0].uri });
+      setImagePreview(result.assets[0].uri);
+    }
+  };
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
@@ -35,7 +58,9 @@ export default function AuthScreen() {
 
       if (response.data.token) {
         await AsyncStorage.setItem('userToken', response.data.token);
-        
+        if (response.data.userId) {
+          await AsyncStorage.setItem('userId', response.data.userId);
+        }
         // Check if this is a new user registration
         if (!isLogin) {
           // For new users, redirect to onboarding
@@ -78,6 +103,22 @@ export default function AuthScreen() {
         </View>
 
         <View style={styles.formContainer}>
+        {!isLogin && (
+  <View style={styles.photoSection}>
+    <TouchableOpacity onPress={pickProfilePhoto} style={styles.avatarCircle}>
+  {imagePreview ? (
+    <Image source={{ uri: imagePreview }} style={styles.image} />
+  ) : (
+    <IconSymbol name="camera.circle.fill" size={80} color="#ccc" />
+  )}
+</TouchableOpacity>
+
+    <ThemedText style={styles.photoText}>
+      {imagePreview ? 'Change Profile Photo' : 'Add Profile Photo'}
+    </ThemedText>
+  </View>
+)}
+
           {!isLogin && (
             <TextInput
               style={styles.input}
@@ -136,7 +177,7 @@ export default function AuthScreen() {
               {isLogin ? 'Login' : 'Create Account'}
             </ThemedText>
           </TouchableOpacity>
-
+{/* 
           <View style={styles.socialContainer}>
             <ThemedText style={styles.socialText}>Or continue with</ThemedText>
             <View style={styles.socialButtons}>
@@ -152,7 +193,7 @@ export default function AuthScreen() {
                 </TouchableOpacity>
               )}
             </View>
-          </View>
+          </View> */}
         </View>
       </ScrollView>
     </LinearGradient>
@@ -242,4 +283,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  photoSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  avatarCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  photoText: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.8,
+  },
+  image: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    resizeMode: 'cover',
+  },
+  
 });
