@@ -99,6 +99,7 @@ export default function Dashboard({ navigation }: { navigation: { navigate: (scr
             <ThemedText type="subtitle" style={styles.cardTitle}>View Service Requests</ThemedText>
             <ThemedText style={styles.cardText}>See all requests from seekers</ThemedText>
           </TouchableOpacity>
+          {/* Only show My Services for providers */}
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Services')}>
             <ThemedText type="subtitle" style={styles.cardTitle}>My Services</ThemedText>
             <ThemedText style={styles.cardText}>Manage your offered services</ThemedText>
@@ -118,6 +119,7 @@ export default function Dashboard({ navigation }: { navigation: { navigate: (scr
             <ThemedText type="subtitle" style={styles.cardTitle}>My Bookings</ThemedText>
             <ThemedText style={styles.cardText}>View your service requests</ThemedText>
           </TouchableOpacity>
+          {/* Do NOT show My Services for seekers */}
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Services')}>
             <ThemedText type="subtitle" style={styles.cardTitle}>Browse Services</ThemedText>
             <ThemedText style={styles.cardText}>Find and book providers</ThemedText>

@@ -6,6 +6,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '@/config';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState<any>(null);
@@ -107,6 +108,23 @@ export default function ProfileScreen() {
     }
   };
 
+  // Add image picker handler
+  const pickProfilePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Permission to access gallery is required!');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setProfilePhoto(result.assets[0].uri);
+    }
+  };
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -120,13 +138,15 @@ export default function ProfileScreen() {
           </View>
           {editable ? (
             <>
+              <TouchableOpacity style={styles.photoButton} onPress={pickProfilePhoto}>
+                <ThemedText style={styles.photoButtonText}>
+                  {profilePhoto ? 'Change Profile Photo' : 'Add Profile Photo'}
+                </ThemedText>
+              </TouchableOpacity>
               <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Full Name" />
               <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="Email" keyboardType="email-address" />
               <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="Phone" keyboardType="phone-pad" />
               <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="Address" />
-              <TouchableOpacity style={styles.photoButton} onPress={() => Alert.alert('Change Photo', 'Photo picker not implemented yet.')}> 
-                <ThemedText style={styles.photoButtonText}>Change Profile Photo</ThemedText>
-              </TouchableOpacity>
             </>
           ) : (
             <>

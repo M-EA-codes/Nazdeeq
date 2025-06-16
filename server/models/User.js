@@ -19,7 +19,8 @@ const userSchema = new mongoose.Schema({
   rating: { type: Number, default: 0 },
   completedOrders: { type: Number, default: 0 },
   reviews: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Review' }],
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  availability: { type: String } // Add this line for provider availability
 });
 
 module.exports = mongoose.models.User || mongoose.model('User', userSchema);
