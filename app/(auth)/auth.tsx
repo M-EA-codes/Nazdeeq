@@ -59,6 +59,7 @@ export default function AuthScreen() {
       if (response.data.token) {
         await AsyncStorage.setItem('userToken', response.data.token);
         if (response.data.userId) {
+
           await AsyncStorage.setItem('userId', response.data.userId);
         }
         // Check if this is a new user registration
