@@ -3,6 +3,7 @@ import { View, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { ThemedText } from '../../../components/ThemedText';
 import { ThemedView } from '../../../components/ThemedView';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import config from '@/config';
 
 export default function ReviewSection({ route }: { route: any }) {
   const [reviews, setReviews] = useState<any[]>([]);
@@ -26,7 +27,7 @@ export default function ReviewSection({ route }: { route: any }) {
         return;
       }
       try {
-        const res = await fetch(`http://localhost:5000/api/neighbor-works/provider/${userId}/reviews`);
+        const res = await fetch(`${config.API_URL}/neighbor-works/provider/${userId}/reviews`);
         const data = await res.json();
         setReviews(data);
       } catch {}
@@ -54,6 +55,9 @@ export default function ReviewSection({ route }: { route: any }) {
             <ThemedText type="subtitle">{item.reviewer?.fullName || 'Anonymous'}</ThemedText>
             <ThemedText>Rating: {item.rating} ⭐</ThemedText>
             <ThemedText style={styles.comment}>{item.comment}</ThemedText>
+            {item.reply && (
+              <ThemedText style={{ color: '#3b5998', marginTop: 6 }}>Provider Reply: {item.reply}</ThemedText>
+            )}
           </View>
         )}
         contentContainerStyle={styles.list}
@@ -70,7 +74,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f7f9fa',
   },
   header: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
     color: '#3b5998',
@@ -90,8 +94,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   comment: {
-    marginTop: 6,
+    marginTop: 8,
     color: '#444',
-    fontStyle: 'italic',
   },
 });

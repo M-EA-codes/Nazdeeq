@@ -86,45 +86,45 @@ export default function Dashboard({ navigation }: { navigation: { navigate: (scr
 
   return (
     <ThemedView style={styles.container}>
-      <TouchableOpacity style={styles.toggleButton} onPress={handleToggleRole}>
-        <ThemedText style={styles.toggleButtonText}>
+      <TouchableOpacity style={styles.button} onPress={handleToggleRole}>
+        <ThemedText style={styles.buttonText}>
           Switch to {userType === 'provider' ? 'Service Seeker' : 'Service Provider'}
         </ThemedText>
       </TouchableOpacity>
       <ThemedText type="title" style={styles.header}>{userType === 'provider' ? 'Provider Dashboard' : 'Service Seeker Dashboard'}</ThemedText>
-      <ThemedText style={styles.welcome}>Welcome{userName ? `, ${userName}` : ''}!</ThemedText>
+      <ThemedText style={styles.welcomeBlue}>Welcome{userName ? `, ${userName}` : ''}!</ThemedText>
       {userType === 'provider' ? (
         <>
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Bookings', { userType })}>
-            <ThemedText type="subtitle">View Service Requests</ThemedText>
-            <ThemedText>See all requests from seekers</ThemedText>
+            <ThemedText type="subtitle" style={styles.cardTitle}>View Service Requests</ThemedText>
+            <ThemedText style={styles.cardText}>See all requests from seekers</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Services')}>
-            <ThemedText type="subtitle">My Services</ThemedText>
-            <ThemedText>Manage your offered services</ThemedText>
+            <ThemedText type="subtitle" style={styles.cardTitle}>My Services</ThemedText>
+            <ThemedText style={styles.cardText}>Manage your offered services</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Reviews')}>
-            <ThemedText type="subtitle">My Reviews</ThemedText>
-            <ThemedText>See feedback from seekers</ThemedText>
+            <ThemedText type="subtitle" style={styles.cardTitle}>My Reviews</ThemedText>
+            <ThemedText style={styles.cardText}>See feedback from seekers</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Profile')}>
-            <ThemedText type="subtitle">My Profile</ThemedText>
-            <ThemedText>View and edit your profile</ThemedText>
+            <ThemedText type="subtitle" style={styles.cardTitle}>My Profile</ThemedText>
+            <ThemedText style={styles.cardText}>View and edit your profile</ThemedText>
           </TouchableOpacity>
         </>
       ) : (
         <>
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Bookings', { userType })}>
-            <ThemedText type="subtitle">My Bookings</ThemedText>
-            <ThemedText>View your service requests</ThemedText>
+            <ThemedText type="subtitle" style={styles.cardTitle}>My Bookings</ThemedText>
+            <ThemedText style={styles.cardText}>View your service requests</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Services')}>
-            <ThemedText type="subtitle">Browse Services</ThemedText>
-            <ThemedText>Find and book providers</ThemedText>
+            <ThemedText type="subtitle" style={styles.cardTitle}>Browse Services</ThemedText>
+            <ThemedText style={styles.cardText}>Find and book providers</ThemedText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Reviews')}>
-            <ThemedText type="subtitle">My Reviews</ThemedText>
-            <ThemedText>See your submitted reviews</ThemedText>
+            <ThemedText type="subtitle" style={styles.cardTitle}>My Reviews</ThemedText>
+            <ThemedText style={styles.cardText}>See your submitted reviews</ThemedText>
           </TouchableOpacity>
         </>
       )}
@@ -135,11 +135,11 @@ export default function Dashboard({ navigation }: { navigation: { navigate: (scr
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
+    padding: 20,
     backgroundColor: '#f7f9fa',
   },
   header: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
     color: '#3b5998',
@@ -151,6 +151,13 @@ const styles = StyleSheet.create({
     color: '#444',
     alignSelf: 'center',
   },
+  welcomeBlue: {
+    fontSize: 16,
+    marginBottom: 18,
+    color: '#3b5998',
+    alignSelf: 'center',
+    fontWeight: 'bold',
+  },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -161,14 +168,25 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  toggleButton: {
-    backgroundColor: '#3b5998',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 18,
-    alignSelf: 'center',
+  cardTitle: {
+    color: '#3b5998',
+    fontWeight: 'bold',
+    fontSize: 17,
+    marginBottom: 2,
   },
-  toggleButtonText: {
+  cardText: {
+    color: '#3b5998',
+    fontSize: 15,
+  },
+  button: {
+    backgroundColor: '#3b5998',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  buttonText: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,

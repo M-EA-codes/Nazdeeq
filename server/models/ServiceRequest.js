@@ -8,6 +8,10 @@ const ServiceRequestSchema = new Schema({
   dateTime: { type: Date, required: true },
   status: { type: String, enum: ['pending', 'accepted', 'completed', 'cancelled'], default: 'pending' },
   reviewId: { type: Schema.Types.ObjectId, ref: 'Review' },
+  notes: { type: String },
+  address: { type: String },
+  paymentStatus: { type: String, enum: ['unpaid', 'paid', 'pending'], default: 'unpaid' },
+  history: [{ status: String, changedAt: Date }],
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });

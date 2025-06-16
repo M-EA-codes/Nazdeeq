@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 
-export default function NeighborCommuteDashboard({ navigation }) {
+export default function NeighborCommuteDashboard({ navigation }: { navigation: any }) {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('RideDiscovery')}>

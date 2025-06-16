@@ -6,6 +6,11 @@ const userSchema = new mongoose.Schema({
   phoneNumber: { type: String, required: true },
   password: { type: String, required: true },
   address: { type: String },
+  city: { type: String },
+  state: { type: String },
+  profilePhoto: { type: String },
+  isVerified: { type: Boolean, default: false },
+  verificationDocs: [{ url: String, uploadedAt: Date }],
   roles: {
     serviceSeeker: { type: Boolean, default: false },
     serviceProvider: { type: Boolean, default: false }

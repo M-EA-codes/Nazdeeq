@@ -41,7 +41,8 @@ app.post('/api/register', async (req, res) => {
       password,
       address,
       roles,
-      serviceCategories
+      serviceCategories,
+      profilePhoto
     } = req.body;
 
     // Check if user already exists
@@ -62,6 +63,7 @@ app.post('/api/register', async (req, res) => {
       address: address || '',
       roles: roles || { serviceSeeker: true, serviceProvider: false },
       serviceCategories: serviceCategories || [],
+      profilePhoto: profilePhoto || '',
       rating: 0,
       completedOrders: 0,
       reviews: []
