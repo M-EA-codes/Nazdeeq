@@ -12,6 +12,7 @@ export default function NeighborWorksLayout() {
     <Stack.Navigator initialRouteName="Dashboard">
       <Stack.Screen name="Dashboard" component={Dashboard} />
       <Stack.Screen name="Profile" component={ProviderProfile} />
+      <Stack.Screen name="ProviderProfile" component={ProviderProfile} />
       <Stack.Screen name="Services" component={ServiceList} />
       <Stack.Screen name="Bookings" component={BookingList} />
       <Stack.Screen name="Reviews" component={ReviewSection} />

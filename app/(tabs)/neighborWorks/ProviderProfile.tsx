@@ -21,29 +21,44 @@ export default function ProviderProfileScreen({ route }: { route: any }) {
   const [availability, setAvailability] = useState('');
   const [loadingSave, setLoadingSave] = useState(false);
 
+  // Determine if viewing own profile or another provider's profile
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
+
   useEffect(() => {
     const fetchProvider = async () => {
       setLoading(true);
-      let userId = route?.params?.provider?._id || route?.params?.providerId;
 
-      // Try AsyncStorage userId first
-      if (!userId) {
-        userId = await AsyncStorage.getItem('userId');
-        if (!userId) {
-          const prefs = await AsyncStorage.getItem('userPreferences');
-          if (prefs) {
-            try {
-              const parsed = JSON.parse(prefs);
-              userId = parsed.userId || parsed._id;
-            } catch (e) {
-              // ignore parse error
-            }
-          }
+      // 1. If route.params.provider is an object, use its _id
+      let userId: string | undefined = undefined;
+      if (route?.params?.provider && typeof route.params.provider === 'object' && route.params.provider._id) {
+        userId = route.params.provider._id;
+      }
+      // 2. If route.params.providerId is present, use it
+      else if (route?.params?.providerId) {
+        userId = route.params.providerId;
+      }
+
+      // 3. Always get myUserId for comparison
+      let myUserId: string | null = await AsyncStorage.getItem('userId');
+      if (!myUserId) {
+        const prefs = await AsyncStorage.getItem('userPreferences');
+        if (prefs) {
+          try {
+            const parsed = JSON.parse(prefs);
+            myUserId = parsed.userId || parsed._id;
+          } catch (e) {}
         }
       }
 
-      console.log('Fetching provider with ID:', userId);
+      // 4. If no userId found in params, fallback to own profile
+      if (!userId) {
+        userId = myUserId || undefined;
+      }
 
+      // Only set isOwnProfile if the userId being viewed matches the logged-in user
+      setIsOwnProfile(userId === myUserId);
+
+      // Only fetch if we have a userId
       if (!userId) {
         setLoading(false);
         Alert.alert('Error', 'Unable to determine user ID. Please log in again.');
@@ -60,11 +75,13 @@ export default function ProviderProfileScreen({ route }: { route: any }) {
         setPhoneNumber(data.phoneNumber || '');
         setAddress(data.address || '');
         setAvailability(data.availability || '');
-        // Update AsyncStorage with latest provider info
-        await AsyncStorage.setItem('userPreferences', JSON.stringify({
-          ...data,
-          userId: data._id
-        }));
+        // Only update AsyncStorage if this is your own profile
+        if (userId === myUserId) {
+          await AsyncStorage.setItem('userPreferences', JSON.stringify({
+            ...data,
+            userId: data._id
+          }));
+        }
       } catch (err) {
         console.error('Provider fetch error:', err);
         Alert.alert('Error', 'Failed to load provider information');
@@ -145,7 +162,8 @@ export default function ProviderProfileScreen({ route }: { route: any }) {
             ) : (
               <IconSymbol name="person.crop.circle.fill" size={80} color="#4c669f" />
             )}
-            {editing && (
+            {/* Only allow photo change if own profile and editing */}
+            {editing && isOwnProfile && (
               <TouchableOpacity style={styles.photoButton} onPress={pickProfilePhoto}>
                 <ThemedText style={styles.photoButtonText}>
                   {profilePhoto ? 'Change Photo' : 'Add Photo'}
@@ -153,7 +171,7 @@ export default function ProviderProfileScreen({ route }: { route: any }) {
               </TouchableOpacity>
             )}
           </View>
-          {editing ? (
+          {editing && isOwnProfile ? (
             <>
               <TextInput
                 style={styles.input}
@@ -200,30 +218,35 @@ export default function ProviderProfileScreen({ route }: { route: any }) {
             </>
           )}
         </View>
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Account Settings</ThemedText>
-          <View style={styles.card}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => setEditing(!editing)}>
-              <IconSymbol name="pencil" size={20} color="#4c669f" />
-              <ThemedText style={styles.menuText}>{editing ? 'Cancel Edit' : 'Edit Profile'}</ThemedText>
-            </TouchableOpacity>
-            {editing && (
-              <TouchableOpacity style={styles.menuItem} onPress={handleSave} disabled={loadingSave}>
-                <IconSymbol name="square.and.arrow.down" size={20} color="#4c669f" />
-                <ThemedText style={styles.menuText}>{loadingSave ? 'Saving...' : 'Save Changes'}</ThemedText>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Other Settings</ThemedText>
-          <View style={styles.card}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Change Password', 'Password change not implemented yet.')}>
-              <IconSymbol name="key.fill" size={20} color="#4c669f" />
-              <ThemedText style={styles.menuText}>Change Password</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Only show edit and change password if own profile */}
+        {isOwnProfile && (
+          <>
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>Account Settings</ThemedText>
+              <View style={styles.card}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => setEditing(!editing)}>
+                  <IconSymbol name="pencil" size={20} color="#4c669f" />
+                  <ThemedText style={styles.menuText}>{editing ? 'Cancel Edit' : 'Edit Profile'}</ThemedText>
+                </TouchableOpacity>
+                {editing && (
+                  <TouchableOpacity style={styles.menuItem} onPress={handleSave} disabled={loadingSave}>
+                    <IconSymbol name="square.and.arrow.down" size={20} color="#4c669f" />
+                    <ThemedText style={styles.menuText}>{loadingSave ? 'Saving...' : 'Save Changes'}</ThemedText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+            <View style={styles.section}>
+              <ThemedText style={styles.sectionTitle}>Other Settings</ThemedText>
+              <View style={styles.card}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Change Password', 'Password change not implemented yet.')}>
+                  <IconSymbol name="key.fill" size={20} color="#4c669f" />
+                  <ThemedText style={styles.menuText}>Change Password</ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        )}
       </ScrollView>
     </ThemedView>
   );

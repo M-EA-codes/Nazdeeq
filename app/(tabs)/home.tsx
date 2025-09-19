@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import config from '../../config'; // <-- Fix import to use your JS config file
+import { FontAwesome5 } from '@expo/vector-icons';
 
 interface Activity {
   id: number;
@@ -47,7 +49,6 @@ interface UserPreferences {
   isFirstLogin: boolean;
 }
 
-
 export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -60,25 +61,40 @@ export default function HomeScreen() {
     if (hours < 12) setGreeting('Good Morning');
     else if (hours < 18) setGreeting('Good Afternoon');
     else setGreeting('Good Evening');
-    
+
     // Load user data and preferences
     const loadUserData = async () => {
       try {
         const token = await AsyncStorage.getItem('userToken');
         const prefsString = await AsyncStorage.getItem('userPreferences');
-        
+        let userId = await AsyncStorage.getItem('userId');
         if (!token) {
-          // If no token, redirect to welcome screen
           router.replace('/(auth)/welcome');
           return;
         }
-        
-        // Mock user data (in a real app, this would come from an API)
-        const mockUserData = {
-          name: 'Ahmed',
-          location: 'Islamabad',
-          trustScore: 75,
-          profilePicture: null, // placeholder for profile picture
+
+        // Fetch real user data from backend
+        let realUserData: any = null;
+        if (userId && token) {
+          try {
+            const res = await fetch(`${config.API_URL}/users/${userId}`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            if (res.ok) {
+              realUserData = await res.json();
+            }
+          } catch {}
+        }
+
+        // Use real user data if available, otherwise fallback to mock
+        setUserData({
+          name: realUserData?.fullName || 'User',
+          location: realUserData?.address || 'Islamabad',
+          trustScore: realUserData?.trustScore ?? 75,
+          profilePicture: realUserData?.profilePhoto || null,
           recentActivities: [
             { id: 1, type: 'ride', message: 'Ali is offering a ride tomorrow at 8 AM – Join now!', icon: 'car.fill' },
             { id: 2, type: 'service', message: 'Your booked technician for electrical repair is arriving today at 3 PM.', icon: 'wrench.fill' },
@@ -89,22 +105,20 @@ export default function HomeScreen() {
             { id: 2, message: 'You liked gardening discussions – Join a local gardening meetup this weekend!', icon: 'leaf' },
             { id: 3, message: 'A neighbor nearby needs plumbing help – Offer assistance?', icon: 'hand.raised' }
           ]
-        };
-        
-        setUserData(mockUserData);
-        
+        });
+
         if (prefsString) {
           const prefs = JSON.parse(prefsString);
           setUserPreferences(prefs);
         }
-        
+
         setLoading(false);
       } catch (error) {
         console.error('Error loading user data:', error);
         setLoading(false);
       }
     };
-    
+
     loadUserData();
   }, []);
   
@@ -124,7 +138,14 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.userInfoContainer}>
             <View style={styles.profileImageContainer}>
-              <IconSymbol name="person.crop.circle.fill" size={60} color="#4c669f" />
+              {userData?.profilePicture ? (
+                <Image
+                  source={{ uri: userData.profilePicture }}
+                  style={{ width: 60, height: 60, borderRadius: 30 }}
+                />
+              ) : (
+                <IconSymbol name="person.crop.circle.fill" size={60} color="#4c669f" />
+              )}
             </View>
             <View style={styles.userTextInfo}>
               <ThemedText style={styles.greeting}>{greeting}, {userData?.name}!</ThemedText>
@@ -143,19 +164,29 @@ export default function HomeScreen() {
         
         {/* Quick Action Buttons */}
         <View style={styles.quickActionsContainer}>
-          <TouchableOpacity style={styles.quickActionButton}>
-            <IconSymbol name="house.fill" size={24} color="#fff" />
+          <TouchableOpacity
+            style={styles.quickActionButton}
+            onPress={() => router.replace('/neighborcommute/Dashboard')}
+          >
+            <FontAwesome5 name="car-side" size={24} color="#fff" />
             <ThemedText style={styles.quickActionText}>NeighborCommute</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.quickActionButton}>
-            <IconSymbol name="house.fill" size={24} color="#fff" />
+          <TouchableOpacity
+            style={styles.quickActionButton}
+            onPress={() => router.replace('/neighborWorks/Dashboard')}
+          >
+            <FontAwesome5 name="house-damage" size={24} color="#fff" />
             <ThemedText style={styles.quickActionText}>Neighborworks</ThemedText>
-            router.replace('neighborWorks/Dashboard');
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.quickActionButton}>
-            <IconSymbol name="house.fill" size={24} color="#fff" />
+          <TouchableOpacity
+            style={styles.quickActionButton}
+            onPress={() => router.replace('/community')}
+          >
+            <FontAwesome5 name="users-cog" size={24} color="#fff" />
+            {/* If using FontAwesomeIcon and faUsersGear: */}
+            {/* <FontAwesomeIcon icon={faUsersGear} size={24} color="#fff" /> */}
             <ThemedText style={styles.quickActionText}>VibeTribe</ThemedText>
           </TouchableOpacity>
         </View>
@@ -182,27 +213,35 @@ export default function HomeScreen() {
         {/* Modules Quick Access */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Modules Quick Access</ThemedText>
-          
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.modulesScrollView}>
-            <TouchableOpacity style={styles.moduleCard}>
+            <TouchableOpacity
+              style={styles.moduleCard}
+              onPress={() => router.replace('/neighborcommute/Dashboard')}
+            >
               <View style={styles.moduleIconContainer}>
-                <IconSymbol name="house.fill" size={30} color="#4c669f" />
+                <FontAwesome5 name="car-side" size={30} color="#4c669f" />
               </View>
               <ThemedText style={styles.moduleTitle}>NeighborCommute</ThemedText>
               <ThemedText style={styles.moduleDescription}>3 rides available near you</ThemedText>
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.moduleCard}>
+
+            <TouchableOpacity
+              style={styles.moduleCard}
+              onPress={() => router.replace('/neighborWorks/Dashboard')}
+            >
               <View style={styles.moduleIconContainer}>
-                <IconSymbol name="house.fill" size={30} color="#4c669f" />
+                <FontAwesome5 name="house-damage" size={30} color="#4c669f" />
               </View>
               <ThemedText style={styles.moduleTitle}>Neighborworks</ThemedText>
               <ThemedText style={styles.moduleDescription}>5 top-rated service providers</ThemedText>
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.moduleCard}>
+
+            <TouchableOpacity
+              style={styles.moduleCard}
+              onPress={() => router.replace('/community')}
+            >
               <View style={styles.moduleIconContainer}>
-                <IconSymbol name="house.fill" size={30} color="#4c669f" />
+                <FontAwesome5 name="users-cog" size={30} color="#4c669f" />
               </View>
               <ThemedText style={styles.moduleTitle}>VibeTribe</ThemedText>
               <ThemedText style={styles.moduleDescription}>2 events happening soon</ThemedText>
@@ -391,4 +430,5 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     fontSize: 14,
-  },});
+  },
+});

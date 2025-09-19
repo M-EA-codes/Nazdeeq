@@ -183,6 +183,11 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Add logout button here */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <ThemedText style={styles.logoutText}>Logout</ThemedText>
+        </TouchableOpacity>
       </ScrollView>
     </ThemedView>
   );
