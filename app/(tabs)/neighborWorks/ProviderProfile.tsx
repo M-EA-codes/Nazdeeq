@@ -1,311 +1,352 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Image, ActivityIndicator, ScrollView, Alert, TouchableOpacity, TextInput } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import config from '@/config';
-import * as ImagePicker from 'expo-image-picker';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { LogBox } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  Image,
+  Dimensions
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import api from '../../api';
 
-export default function ProviderProfileScreen({ route }: { route: any }) {
-  const [provider, setProvider] = useState<any>(null);
+const { width } = Dimensions.get('window');
+
+export default function ProviderProfileScreen({ route, navigation }: { route: any; navigation: any }) {
+  const { providerId } = route.params || {};
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-
-  const [profilePhoto, setProfilePhoto] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [address, setAddress] = useState('');
-  const [availability, setAvailability] = useState('');
-  const [loadingSave, setLoadingSave] = useState(false);
-
-  // Determine if viewing own profile or another provider's profile
-  const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [provider, setProvider] = useState<any>(null);
+  const [services, setServices] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchProvider = async () => {
-      setLoading(true);
-
-      // 1. If route.params.provider is an object, use its _id
-      let userId: string | undefined = undefined;
-      if (route?.params?.provider && typeof route.params.provider === 'object' && route.params.provider._id) {
-        userId = route.params.provider._id;
-      }
-      // 2. If route.params.providerId is present, use it
-      else if (route?.params?.providerId) {
-        userId = route.params.providerId;
-      }
-
-      // 3. Always get myUserId for comparison
-      let myUserId: string | null = await AsyncStorage.getItem('userId');
-      if (!myUserId) {
-        const prefs = await AsyncStorage.getItem('userPreferences');
-        if (prefs) {
-          try {
-            const parsed = JSON.parse(prefs);
-            myUserId = parsed.userId || parsed._id;
-          } catch (e) {}
-        }
-      }
-
-      // 4. If no userId found in params, fallback to own profile
-      if (!userId) {
-        userId = myUserId || undefined;
-      }
-
-      // Only set isOwnProfile if the userId being viewed matches the logged-in user
-      setIsOwnProfile(userId === myUserId);
-
-      // Only fetch if we have a userId
-      if (!userId) {
-        setLoading(false);
-        Alert.alert('Error', 'Unable to determine user ID. Please log in again.');
-        return;
-      }
-      try {
-        const res = await fetch(`${config.API_URL}/users/${userId}`);
-        if (!res.ok) throw new Error('Failed to fetch provider');
-        const data = await res.json();
-        setProvider(data);
-        setProfilePhoto(data.profilePhoto || '');
-        setFullName(data.fullName || '');
-        setEmail(data.email || '');
-        setPhoneNumber(data.phoneNumber || '');
-        setAddress(data.address || '');
-        setAvailability(data.availability || '');
-        // Only update AsyncStorage if this is your own profile
-        if (userId === myUserId) {
-          await AsyncStorage.setItem('userPreferences', JSON.stringify({
-            ...data,
-            userId: data._id
-          }));
-        }
-      } catch (err) {
-        console.error('Provider fetch error:', err);
-        Alert.alert('Error', 'Failed to load provider information');
-      }
-      setLoading(false);
-    };
-    fetchProvider();
-  }, [route]);
-
-  const pickProfilePhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Permission to access gallery is required!');
-      return;
+    if (providerId) {
+      fetchProviderData();
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: false,
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProfilePhoto(result.assets[0].uri);
-    }
-  };
+  }, [providerId]);
 
-  const handleSave = async () => {
-    if (!provider) return;
-    setLoadingSave(true);
+  const fetchProviderData = async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) throw new Error('No auth token');
-      const response = await fetch(`${config.API_URL}/users/${provider._id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fullName,
-          email,
-          phoneNumber,
-          address,
-          profilePhoto,
-          availability
-        }),
-      });
-      if (!response.ok) throw new Error('Failed to update profile');
-      const updated = await response.json();
-      setProvider(updated);
-      setEditing(false);
-      // Update AsyncStorage with latest provider info
-      await AsyncStorage.setItem('userPreferences', JSON.stringify({
-        ...updated,
-        userId: updated._id
-      }));
-      Alert.alert('Success', 'Profile updated successfully');
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update profile');
+      setLoading(true);
+      const [providerRes, servicesRes] = await Promise.all([
+        api.get(`/users/${providerId}`),
+        api.get(`/services/provider/${providerId}`)
+      ]);
+      
+      setProvider(providerRes.data);
+      setServices(servicesRes.data);
+    } catch (error) {
+      console.error('Error fetching provider data:', error);
+      Alert.alert('Error', 'Failed to load provider information.');
+    } finally {
+      setLoading(false);
     }
-    setLoadingSave(false);
   };
 
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
-        <ActivityIndicator size="large" color="#3b5998" />
-      </ThemedView>
+      <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.loadingText}>Loading provider...</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  if (!provider) {
+    return (
+      <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.container}>
+        <View style={styles.errorContainer}>
+          <MaterialIcons name="error" size={48} color="#fff" />
+          <Text style={styles.errorText}>Provider not found</Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+    <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.container}>
+      <ScrollView>
+        {/* Header */}
         <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            {profilePhoto ? (
-              <Image source={{ uri: profilePhoto }} style={{ width: 80, height: 80, borderRadius: 40 }} />
-            ) : (
-              <IconSymbol name="person.crop.circle.fill" size={80} color="#4c669f" />
-            )}
-            {/* Only allow photo change if own profile and editing */}
-            {editing && isOwnProfile && (
-              <TouchableOpacity style={styles.photoButton} onPress={pickProfilePhoto}>
-                <ThemedText style={styles.photoButtonText}>
-                  {profilePhoto ? 'Change Photo' : 'Add Photo'}
-                </ThemedText>
-              </TouchableOpacity>
-            )}
-          </View>
-          {editing && isOwnProfile ? (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="Full Name"
-                value={fullName}
-                onChangeText={setFullName}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Phone Number"
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                keyboardType="phone-pad"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Address"
-                value={address}
-                onChangeText={setAddress}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Availability (e.g. Mon-Fri 9am-5pm)"
-                value={availability}
-                onChangeText={setAvailability}
-              />
-            </>
-          ) : (
-            <>
-              <ThemedText style={styles.name}>{provider?.fullName || 'User Name'}</ThemedText>
-              <ThemedText style={styles.email}>{provider?.email || 'user@example.com'}</ThemedText>
-              <ThemedText style={styles.email}>{provider?.phoneNumber || 'Not Provided'}</ThemedText>
-              <ThemedText style={styles.email}>{provider?.address || 'Not Provided'}</ThemedText>
-              <ThemedText style={styles.email}>Availability: {provider?.availability || 'Not Provided'}</ThemedText>
-              <ThemedText style={styles.email}>Rating: {provider?.rating || 'N/A'} ⭐</ThemedText>
-              <ThemedText style={styles.email}>Verified: {provider?.isVerified ? 'Yes' : 'No'}</ThemedText>
-            </>
-          )}
+          <TouchableOpacity 
+            style={styles.headerBackButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Provider Profile</Text>
+          <View style={styles.headerPlaceholder} />
         </View>
-        {/* Only show edit and change password if own profile */}
-        {isOwnProfile && (
-          <>
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>Account Settings</ThemedText>
-              <View style={styles.card}>
-                <TouchableOpacity style={styles.menuItem} onPress={() => setEditing(!editing)}>
-                  <IconSymbol name="pencil" size={20} color="#4c669f" />
-                  <ThemedText style={styles.menuText}>{editing ? 'Cancel Edit' : 'Edit Profile'}</ThemedText>
+
+        {/* Provider Info */}
+        <View style={styles.providerCard}>
+          <View style={styles.providerHeader}>
+            <Image 
+              source={{ 
+                uri: provider.profilePhoto || `https://via.placeholder.com/80x80/4b32c3/ffffff?text=${provider.fullName?.charAt(0) || 'P'}`
+              }}
+              style={styles.providerAvatar}
+            />
+            <View style={styles.providerInfo}>
+              <Text style={styles.providerName}>{provider.fullName || 'Unknown Provider'}</Text>
+              <View style={styles.ratingContainer}>
+                <MaterialIcons name="star" size={20} color="#ffd93d" />
+                <Text style={styles.rating}>{(provider.rating || 4.5).toFixed(1)}</Text>
+                <Text style={styles.reviewCount}>({provider.reviewCount || 0} reviews)</Text>
+              </View>
+              <Text style={styles.joinDate}>
+                Joined {new Date(provider.createdAt || Date.now()).toLocaleDateString()}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.contactButtons}>
+            <TouchableOpacity style={styles.contactButton}>
+              <MaterialIcons name="phone" size={18} color="#4b32c3" />
+              <Text style={styles.contactButtonText}>Call</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.messageButton}>
+              <MaterialIcons name="message" size={18} color="#fff" />
+              <Text style={styles.messageButtonText}>Message</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Services */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Services Offered</Text>
+          {services.map((service) => (
+            <View key={service._id} style={styles.serviceCard}>
+              <View style={styles.serviceHeader}>
+                <Text style={styles.serviceTitle}>{service.title}</Text>
+                <Text style={styles.serviceCategory}>{service.category}</Text>
+              </View>
+              <Text style={styles.serviceDescription}>{service.description}</Text>
+              <View style={styles.serviceFooter}>
+                <View style={styles.priceContainer}>
+                  {service.fixedPrice ? (
+                    <Text style={styles.price}>${service.fixedPrice}</Text>
+                  ) : service.priceRange ? (
+                    <Text style={styles.price}>${service.priceRange.min} - ${service.priceRange.max}</Text>
+                  ) : (
+                    <Text style={styles.price}>Negotiable</Text>
+                  )}
+                </View>
+                <TouchableOpacity style={styles.bookServiceButton}>
+                  <Text style={styles.bookServiceButtonText}>Book Now</Text>
                 </TouchableOpacity>
-                {editing && (
-                  <TouchableOpacity style={styles.menuItem} onPress={handleSave} disabled={loadingSave}>
-                    <IconSymbol name="square.and.arrow.down" size={20} color="#4c669f" />
-                    <ThemedText style={styles.menuText}>{loadingSave ? 'Saving...' : 'Save Changes'}</ThemedText>
-                  </TouchableOpacity>
-                )}
               </View>
             </View>
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle}>Other Settings</ThemedText>
-              <View style={styles.card}>
-                <TouchableOpacity style={styles.menuItem} onPress={() => Alert.alert('Change Password', 'Password change not implemented yet.')}>
-                  <IconSymbol name="key.fill" size={20} color="#4c669f" />
-                  <ThemedText style={styles.menuText}>Change Password</ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </>
-        )}
+          ))}
+        </View>
       </ScrollView>
-    </ThemedView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContainer: { padding: 16 },
-  header: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  avatarContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(200, 200, 200, 0.3)',
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    gap: 12,
   },
-  name: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-  email: { fontSize: 16, opacity: 0.7 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 8,
-    width: '80%',
-    marginBottom: 8,
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
   },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
-  card: {
-    borderRadius: 8,
-    backgroundColor: 'rgba(200, 200, 200, 0.1)',
-    marginBottom: 12,
-    overflow: 'hidden',
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 20,
   },
-  menuItem: {
+  errorText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(200, 200, 200, 0.2)',
-  },
-  menuText: { fontSize: 16, marginLeft: 12 },
-  photoButton: {
-    backgroundColor: '#4c669f',
-    paddingVertical: 10,
+    justifyContent: 'space-between',
+    paddingTop: 50,
     paddingHorizontal: 20,
-    borderRadius: 20,
-    marginTop: 10,
-    alignItems: 'center',
-    alignSelf: 'center',
+    paddingBottom: 20,
   },
-  photoButtonText: {
+  headerBackButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  headerPlaceholder: {
+    width: 40,
+  },
+  providerCard: {
+    backgroundColor: '#fff',
+    marginHorizontal: 20,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+  providerHeader: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  providerAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#f0f0f0',
+  },
+  providerInfo: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  providerName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  rating: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  reviewCount: {
+    fontSize: 14,
+    color: '#666',
+  },
+  joinDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  contactButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  contactButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4b32c3',
+    backgroundColor: 'rgba(75, 50, 195, 0.1)',
+  },
+  contactButtonText: {
+    color: '#4b32c3',
+    fontWeight: '600',
+  },
+  messageButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#4b32c3',
+  },
+  messageButtonText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  backButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#4b32c3',
+    fontWeight: '600',
+  },
+  section: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  serviceCard: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  serviceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  serviceTitle: {
     fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+  },
+  serviceCategory: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    textTransform: 'capitalize',
+  },
+  serviceDescription: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  serviceFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  priceContainer: {},
+  price: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  bookServiceButton: {
+    backgroundColor: '#4b32c3',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  bookServiceButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

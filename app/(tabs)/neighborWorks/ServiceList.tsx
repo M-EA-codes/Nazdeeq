@@ -1,536 +1,1030 @@
-import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, Image, TextInput, Alert, Modal as RNModal, Text, ScrollView } from 'react-native';
-import { ThemedText } from '../../../components/ThemedText';
-import { ThemedView } from '../../../components/ThemedView';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
+  TextInput,
+  RefreshControl,
+  Dimensions
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import config from '@/config';
-import { IconSymbol } from '@/components/ui/IconSymbol';
 
-const SERVICE_CATEGORIES = [
-  'Electrician', 'Plumber', 'Carpenter', 'Painter', 'Gardener'
-];
+const { width } = Dimensions.get('window');
 
-export default function ServiceListScreen({ navigation }: { navigation: { navigate: (screen: string, params?: any) => void } }) {
-  const [services, setServices] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userType, setUserType] = useState<'provider' | 'seeker'>('seeker');
+interface Provider {
+  _id: string;
+  fullName: string;
+  rating: number;
+  profilePhoto?: string;
+  completedServices?: number;
+  responseTime?: string;
+  phoneNumber?: string;
+  address?: string;
+}
+
+interface Service {
+  _id: string;
+  providerId: Provider;
+  title: string;
+  description: string;
+  category: string;
+  subcategory?: string;
+  priceRange?: {
+    min: number;
+    max: number;
+  };
+  fixedPrice?: number;
+  availability: string[];
+  location: string;
+  images?: string[];
+  rating: number;
+  reviewCount: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface BookingData {
+  serviceId: string;
+  providerId: string;
+  requesterId: string;
+  selectedDate: Date;
+  selectedTimeSlot: string;
+  description: string;
+  urgency: 'low' | 'medium' | 'high';
+  estimatedBudget?: number;
+}
+
+export default function ServiceList() {
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [bookingModalVisible, setBookingModalVisible] = useState(false);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-
   
-  // Add/Edit Modal State
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingService, setEditingService] = useState<any>(null);
-  const [category, setCategory] = useState('');
-  const [description, setDescription] = useState('');
-  const [address, setAddress] = useState('');
-  const [priceRange, setPriceRange] = useState('');
-  const [availability, setAvailability] = useState('');
-  const [gallery, setGallery] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
+  // Booking form states
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
+  const [bookingDescription, setBookingDescription] = useState('');
+  const [urgency, setUrgency] = useState<'low' | 'medium' | 'high'>('medium');
+  const [estimatedBudget, setEstimatedBudget] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
-  // Rating Modal State
-  const [rateModalVisible, setRateModalVisible] = useState(false);
-  const [ratingValue, setRatingValue] = useState(5);
-  const [ratingComment, setRatingComment] = useState('');
-  const [ratingProviderId, setRatingProviderId] = useState<string | null>(null);
-  const [savingRating, setSavingRating] = useState(false);
+  const categories = [
+    { id: 'all', name: 'All Services', icon: 'apps' },
+    { id: 'plumbing', name: 'Plumbing', icon: 'plumbing' },
+    { id: 'electrical', name: 'Electrical', icon: 'electrical-services' },
+    { id: 'cleaning', name: 'Cleaning', icon: 'cleaning-services' },
+    { id: 'gardening', name: 'Gardening', icon: 'grass' },
+    { id: 'carpentry', name: 'Carpentry', icon: 'handyman' },
+    { id: 'painting', name: 'Painting', icon: 'format-paint' },
+    { id: 'tutoring', name: 'Tutoring', icon: 'school' },
+    { id: 'delivery', name: 'Delivery', icon: 'delivery-dining' }
+  ];
+
+  const timeSlots = [
+    '8:00 AM - 10:00 AM',
+    '10:00 AM - 12:00 PM',
+    '12:00 PM - 2:00 PM',
+    '2:00 PM - 4:00 PM',
+    '4:00 PM - 6:00 PM',
+    '6:00 PM - 8:00 PM'
+  ];
 
   useEffect(() => {
-    const fetchUserTypeAndServices = async () => {
-      setLoading(true);
-      let type: 'provider' | 'seeker' = 'seeker';
-      let uid: string | null = null;
-      try {
-        const prefs = await AsyncStorage.getItem('userPreferences');
-        if (prefs) {
-          const parsed = JSON.parse(prefs);
-          if (parsed.roles && parsed.roles.serviceProvider) type = 'provider';
-          uid = parsed.userId || parsed._id;
-        }
-        if (!uid) {
-          uid = await AsyncStorage.getItem('userId');
-        }
-      } catch {}
-      setUserType(type);
-      setUserId(uid);
-
-      let url = '';
-      if (type === 'provider' && uid) {
-        url = `${config.API_URL}/services?providerId=${uid}`;
-      } else {
-        url = `${config.API_URL}/services`;
-      }
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        setServices(data);
-      } catch {}
-      setLoading(false);
-    };
-    fetchUserTypeAndServices();
+    fetchUserData();
+    fetchServices();
   }, []);
 
-  // Add/Edit Service Modal Handlers
-  const openAddModal = () => {
-    setEditingService(null);
-    setCategory('');
-    setDescription('');
-    setAddress('');
-    setPriceRange('');
-    setAvailability('');
-    setGallery([]);
-    setModalVisible(true);
+  const fetchUserData = async () => {
+    try {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      const prefs = await AsyncStorage.getItem('userPreferences');
+      if (storedUserId) {
+        setUserId(storedUserId);
+      } else if (prefs) {
+        const parsed = JSON.parse(prefs);
+        setUserId(parsed.userId);
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
   };
 
-  const openEditModal = (service: any) => {
-    setEditingService(service);
-    setCategory(service.category || '');
-    setDescription(service.description || '');
-    setAddress(service.location || '');
-    setPriceRange(service.priceRange || '');
-    setAvailability(
-      Array.isArray(service.availability)
-        ? service.availability.map((a: any) => a.day).join(', ')
-        : ''
-    );
-    setGallery(service.gallery || []);
-    setModalVisible(true);
+  const fetchServices = async (category?: string, search?: string) => {
+    setLoading(true);
+    try {
+      const params: any = { isActive: true };
+      if (category && category !== 'all') params.category = category;
+      if (search) params.search = search;
+
+      const response = await api.get('/services', { params });
+      setServices(response.data);
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      Alert.alert('Error', 'Failed to load services. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSaveService = async () => {
-    if (!category) {
-      Alert.alert('Validation', 'Please select a category.');
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchServices(selectedCategory, searchQuery);
+    setRefreshing(false);
+  };
+
+  const handleCategorySelect = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    fetchServices(categoryId, searchQuery);
+  };
+
+  const handleSearch = () => {
+    fetchServices(selectedCategory, searchQuery);
+  };
+
+  const openBookingModal = (service: Service) => {
+    setSelectedService(service);
+    setBookingModalVisible(true);
+    
+    // Set tomorrow as default date
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setSelectedDate(tomorrow);
+  };
+
+  const closeBookingModal = () => {
+    setBookingModalVisible(false);
+    setSelectedService(null);
+    setBookingDescription('');
+    setSelectedTimeSlot('');
+    setUrgency('medium');
+    setEstimatedBudget('');
+  };
+
+  const handleBookService = async () => {
+    if (!selectedService || !userId) {
+      Alert.alert('Error', 'Please log in to book a service.');
       return;
     }
-    setSaving(true);
+
+    if (!selectedTimeSlot) {
+      Alert.alert('Missing Information', 'Please select a time slot.');
+      return;
+    }
+
+    if (!bookingDescription.trim()) {
+      Alert.alert('Missing Information', 'Please describe your service requirements.');
+      return;
+    }
+
+    setBookingLoading(true);
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      const payload = {
-        category,
-        provider: userId,
-        description,
-        location: address,
-        priceRange,
-        availability: availability
-          ? availability.split(',').map(day => ({ day: day.trim(), timeSlots: [] }))
-          : [],
-        gallery,
+      const bookingData = {
+        serviceId: selectedService._id,
+        providerId: selectedService.providerId._id,
+        requesterId: userId,
+        scheduledDate: selectedDate.toISOString(),
+        timeSlot: selectedTimeSlot,
+        description: bookingDescription.trim(),
+        urgency,
+        estimatedBudget: estimatedBudget ? parseFloat(estimatedBudget) : undefined,
+        status: 'pending'
       };
-      let url = `${config.API_URL}/services`;
-      let method = 'POST';
-      if (editingService && editingService._id) {
-        url = `${config.API_URL}/services/${editingService._id}`;
-        method = 'PUT';
-      }
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Failed to save service');
-      setModalVisible(false);
-      // Refresh list
-      const refreshed = await fetch(`${config.API_URL}/services?providerId=${userId}`);
-      setServices(await refreshed.json());
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save service');
-    }
-    setSaving(false);
-  };
 
-  const handleDeleteService = async (serviceId: string) => {
-    Alert.alert('Delete Service', 'Are you sure you want to delete this service?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          try {
-            const token = await AsyncStorage.getItem('userToken');
-            const res = await fetch(`${config.API_URL}/services/${serviceId}`, {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-              }
-            });
-            if (!res.ok) throw new Error('Failed to delete service');
-            // Refresh list
-            const refreshed = await fetch(`${config.API_URL}/services?providerId=${userId}`);
-            setServices(await refreshed.json());
-          } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to delete service');
+      await api.post('/service-requests', bookingData);
+      
+      Alert.alert(
+        'Booking Confirmed!',
+        `Your service request has been sent to ${selectedService.providerId.fullName}. They will contact you soon to confirm the appointment.`,
+        [
+          {
+            text: 'OK',
+            onPress: closeBookingModal
           }
-        }
-      }
-    ]);
-  };
-
-  const openRateModal = (providerId: string) => {
-    setRatingProviderId(providerId);
-    setRatingValue(5);
-    setRatingComment('');
-    setRateModalVisible(true);
-  };
-
-  const handleSubmitRating = async () => {
-    if (!ratingProviderId) return;
-    setSavingRating(true);
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      const userId = await AsyncStorage.getItem('userId');
-      await fetch(`${config.API_URL}/neighbor-works/review`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          reviewerId: userId,
-          revieweeId: ratingProviderId,
-          rating: ratingValue,
-          comment: ratingComment
-        })
-      });
-      setRateModalVisible(false);
-      // Refresh list to update ratings
-      let url = userType === 'provider' && userId
-        ? `${config.API_URL}/services?providerId=${userId}`
-        : `${config.API_URL}/services`;
-      const refreshed = await fetch(url);
-      setServices(await refreshed.json());
-      Alert.alert('Thank you!', 'Your feedback has been submitted.');
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to submit rating');
+        ]
+      );
+    } catch (error: any) {
+      console.error('Booking error:', error);
+      const message = error.response?.data?.error || 'Failed to book service. Please try again.';
+      Alert.alert('Booking Failed', message);
+    } finally {
+      setBookingLoading(false);
     }
-    setSavingRating(false);
   };
 
-  if (loading) {
-    return (
-      <ThemedView style={styles.container}>
-        <ActivityIndicator size="large" color="#3b5998" />
-      </ThemedView>
-    );
-  }
+  const generateProfileImage = (userId: string, name: string) => {
+    const colors = ['#7f53ac', '#4b32c3', '#3ad29f', '#3a8fd2', '#ff6b6b'];
+    const colorIndex = userId.length % colors.length;
+    const initial = name.charAt(0).toUpperCase();
+    return `https://via.placeholder.com/80x80/${colors[colorIndex].substring(1)}/ffffff?text=${initial}`;
+  };
 
-  return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title" style={styles.header}>
-        {userType === 'provider' ? 'My Services' : 'Neighbor Works Services'}
-      </ThemedText>
-      {userType === 'provider' && (
-        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <IconSymbol name="plus.circle.fill" size={22} color="#4c669f" />
-          <ThemedText style={styles.addButtonText}>Add New Service</ThemedText>
-        </TouchableOpacity>
-      )}
-      <FlatList
-        data={services}
-        keyExtractor={(item: any) => item._id}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <ThemedText type="subtitle">{item.category}</ThemedText>
-            <ThemedText>Provider: {item.provider?.fullName || 'N/A'}</ThemedText>
-            <ThemedText>Rating: {item.provider?.rating ?? 'N/A'} ⭐</ThemedText>
-            <ThemedText>Verified: {item.provider?.isVerified ? 'Yes' : 'No'}</ThemedText>
-            {item.priceRange && <ThemedText>Price: {item.priceRange}</ThemedText>}
-            {item.location && <ThemedText>Location: {item.location}</ThemedText>}
-            {item.gallery && item.gallery.length > 0 && (
-              <View style={{ flexDirection: 'row', marginTop: 6 }}>
-                {item.gallery.slice(0, 3).map((img: string, idx: number) => (
-                  <Image key={idx} source={{ uri: img }} style={{ width: 40, height: 40, borderRadius: 8, marginRight: 4 }} />
-                ))}
+  const renderCategory = ({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={[
+        styles.categoryItem,
+        selectedCategory === item.id && styles.categoryItemActive
+      ]}
+      onPress={() => handleCategorySelect(item.id)}
+    >
+      <MaterialIcons 
+        name={item.icon} 
+        size={24} 
+        color={selectedCategory === item.id ? '#fff' : '#666'} 
+      />
+      <Text style={[
+        styles.categoryText,
+        selectedCategory === item.id && styles.categoryTextActive
+      ]}>
+        {item.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderService = ({ item }: { item: Service }) => {
+    const profileImage = item.providerId.profilePhoto || 
+                        generateProfileImage(item.providerId._id, item.providerId.fullName);
+    
+    return (
+      <LinearGradient
+        colors={["#fff", "#f8f9ff"]}
+        style={styles.serviceCard}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.serviceHeader}>
+          <View style={styles.providerInfo}>
+            <Image 
+              source={{ uri: profileImage }}
+              style={styles.providerAvatar}
+            />
+            <View style={styles.providerDetails}>
+              <Text style={styles.providerName}>{item.providerId.fullName}</Text>
+              <View style={styles.ratingContainer}>
+                <MaterialIcons name="star" size={16} color="#ffd93d" />
+                <Text style={styles.rating}>
+                  {item.providerId.rating?.toFixed(1) || '4.5'}
+                </Text>
+                <Text style={styles.reviewCount}>
+                  ({item.reviewCount || 0} reviews)
+                </Text>
               </View>
-            )}
-            {/* Show Provider Profile button for every service */}
-            {item.provider && (
-              <TouchableOpacity
-                style={[styles.viewProfileBtn, { marginTop: 10, backgroundColor: '#3b5998' }]}
-                onPress={() => navigation.navigate('ProviderProfile', { provider: item.provider })}
-              >
-                <ThemedText style={styles.viewProfileBtnText}>Show Provider Profile</ThemedText>
-              </TouchableOpacity>
+            </View>
+          </View>
+          
+          <View style={styles.serviceCategory}>
+            <Text style={styles.categoryBadge}>{item.category}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.serviceTitle}>{item.title}</Text>
+        <Text style={styles.serviceDescription} numberOfLines={3}>
+          {item.description}
+        </Text>
+
+        <View style={styles.serviceDetails}>
+          <View style={styles.priceContainer}>
+            {item.fixedPrice ? (
+              <Text style={styles.fixedPrice}>${item.fixedPrice}</Text>
+            ) : item.priceRange ? (
+              <Text style={styles.priceRange}>
+                ${item.priceRange.min} - ${item.priceRange.max}
+              </Text>
+            ) : (
+              <Text style={styles.priceNegotiable}>Price Negotiable</Text>
             )}
           </View>
+
+          <View style={styles.locationContainer}>
+            <MaterialIcons name="location-on" size={16} color="#666" />
+            <Text style={styles.locationText}>{item.location}</Text>
+          </View>
+        </View>
+
+        {item.images && item.images.length > 0 && (
+          <ScrollView 
+            horizontal 
+            style={styles.imagesContainer}
+            showsHorizontalScrollIndicator={false}
+          >
+            {item.images.map((image, index) => (
+              <Image 
+                key={index}
+                source={{ uri: image }}
+                style={styles.serviceImage}
+              />
+            ))}
+          </ScrollView>
         )}
-        contentContainerStyle={styles.list}
+
+        <View style={styles.serviceActions}>
+          <TouchableOpacity style={styles.contactButton}>
+            <MaterialIcons name="phone" size={18} color="#4b32c3" />
+            <Text style={styles.contactButtonText}>Contact</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.bookButton}
+            onPress={() => openBookingModal(item)}
+          >
+            <MaterialIcons name="event" size={18} color="#fff" />
+            <Text style={styles.bookButtonText}>Book Now</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+    );
+  };
+
+  return (
+    <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>NeighborWorks</Text>
+        <Text style={styles.subtitle}>Find trusted local service providers</Text>
+      </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <MaterialIcons name="search" size={20} color="#666" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search services..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+        </View>
+      </View>
+
+      {/* Categories */}
+      <FlatList
+        data={categories}
+        renderItem={renderCategory}
+        keyExtractor={item => item.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoriesList}
+        contentContainerStyle={styles.categoriesContainer}
       />
 
-      {/* Add/Edit Service Modal */}
-      <RNModal visible={modalVisible} animationType="slide" transparent>
+      {/* Services List */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.loadingText}>Loading services...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={services}
+          renderItem={renderService}
+          keyExtractor={item => item._id}
+          contentContainerStyle={styles.servicesList}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#fff"
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <FontAwesome5 name="tools" size={64} color="rgba(255,255,255,0.3)" />
+              <Text style={styles.emptyText}>No services found</Text>
+              <Text style={styles.emptySubtext}>
+                Try adjusting your search or category filter
+              </Text>
+            </View>
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
+
+      {/* Booking Modal */}
+      <Modal visible={bookingModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <ScrollView>
-              <ThemedText type="title" style={{ marginBottom: 12 }}>
-                {editingService ? 'Edit Service' : 'Add New Service'}
-              </ThemedText>
-              <ThemedText style={{ marginBottom: 6 }}>Category</ThemedText>
-              <View style={styles.categoryRow}>
-                {SERVICE_CATEGORIES.map(cat => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoryOption,
-                      category === cat && styles.categoryOptionSelected
-                    ]}
-                    onPress={() => setCategory(cat)}
-                  >
-                    <ThemedText style={category === cat ? styles.categoryOptionTextSelected : styles.categoryOptionText}>
-                      {cat}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TextInput
-                style={styles.input}
-                placeholder="Description"
-                value={description}
-                onChangeText={setDescription}
-                multiline
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Address"
-                value={address}
-                onChangeText={setAddress}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Price Range (e.g. 1000-2000)"
-                value={priceRange}
-                onChangeText={setPriceRange}
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Availability (comma separated days)"
-                value={availability}
-                onChangeText={setAvailability}
-              />
-              {/* Gallery picker can be added here if needed */}
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveService} disabled={saving}>
-                  <ThemedText style={styles.saveBtnText}>{saving ? 'Saving...' : 'Save'}</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
-                  <ThemedText style={styles.cancelBtnText}>Cancel</ThemedText>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Book Service</Text>
+                <TouchableOpacity 
+                  onPress={closeBookingModal}
+                  style={styles.closeButton}
+                >
+                  <MaterialIcons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
+              
+              {selectedService && (
+                <View style={styles.selectedServiceInfo}>
+                  <Text style={styles.selectedServiceCategory}>
+                    {selectedService.category}
+                  </Text>
+                  <Text style={styles.selectedServiceTitle}>
+                    {selectedService.title}
+                  </Text>
+                  <Text style={styles.selectedServiceProvider}>
+                    Provider: {selectedService.providerId.fullName}
+                  </Text>
+                  {selectedService.priceRange ? (
+                    <Text style={styles.selectedServicePrice}>
+                      Price: ${selectedService.priceRange.min} - ${selectedService.priceRange.max}
+                    </Text>
+                  ) : selectedService.fixedPrice ? (
+                    <Text style={styles.selectedServicePrice}>
+                      Price: ${selectedService.fixedPrice}
+                    </Text>
+                  ) : (
+                    <Text style={styles.selectedServicePrice}>
+                      Price: Negotiable
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {/* Date Selection */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Select Date</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <MaterialIcons name="date-range" size={20} color="#4b32c3" />
+                  <Text style={styles.dateButtonText}>
+                    {selectedDate.toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Time Slot Selection */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Select Time Slot</Text>
+                <View style={styles.timeSlotsContainer}>
+                  {timeSlots.map((slot, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.timeSlot,
+                        selectedTimeSlot === slot && styles.timeSlotActive
+                      ]}
+                      onPress={() => setSelectedTimeSlot(slot)}
+                    >
+                      <Text style={[
+                        styles.timeSlotText,
+                        selectedTimeSlot === slot && styles.timeSlotTextActive
+                      ]}>
+                        {slot}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Service Description */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Describe Your Requirements</Text>
+                <TextInput
+                  style={styles.descriptionInput}
+                  placeholder="Please describe what you need help with..."
+                  multiline
+                  numberOfLines={4}
+                  value={bookingDescription}
+                  onChangeText={setBookingDescription}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              {/* Urgency Level */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Urgency Level</Text>
+                <View style={styles.urgencyContainer}>
+                  {(['low', 'medium', 'high'] as const).map((level) => (
+                    <TouchableOpacity
+                      key={level}
+                      style={[
+                        styles.urgencyOption,
+                        urgency === level && styles.urgencyOptionActive,
+                        level === 'low' && { borderColor: '#3ad29f' },
+                        level === 'medium' && { borderColor: '#ffd93d' },
+                        level === 'high' && { borderColor: '#ff6b6b' }
+                      ]}
+                      onPress={() => setUrgency(level)}
+                    >
+                      <Text style={[
+                        styles.urgencyText,
+                        urgency === level && styles.urgencyTextActive
+                      ]}>
+                        {level.charAt(0).toUpperCase() + level.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Budget (Optional) */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Your Budget (Optional)</Text>
+                <View style={styles.budgetInputContainer}>
+                  <MaterialIcons name="attach-money" size={20} color="#666" />
+                  <TextInput
+                    style={styles.budgetInput}
+                    placeholder="Enter your budget"
+                    value={estimatedBudget}
+                    onChangeText={setEstimatedBudget}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              {/* Book Button */}
+              <TouchableOpacity
+                style={[
+                  styles.finalBookButton,
+                  bookingLoading && styles.finalBookButtonDisabled
+                ]}
+                onPress={handleBookService}
+                disabled={bookingLoading}
+              >
+                {bookingLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <MaterialIcons name="event" size={20} color="#fff" />
+                    <Text style={styles.finalBookButtonText}>Confirm Booking</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
-      </RNModal>
 
-      {/* Rate Provider Modal */}
-      <RNModal visible={rateModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ThemedText type="title" style={{ marginBottom: 12 }}>Rate Provider</ThemedText>
-            <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 12 }}>
-              {[1, 2, 3, 4, 5].map((val) => (
-                <TouchableOpacity key={val} onPress={() => setRatingValue(val)}>
-                  <IconSymbol name="star.fill" size={32} color={val <= ratingValue ? "#FFD700" : "#ccc"} />
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Leave a comment (optional)"
-              value={ratingComment}
-              onChangeText={setRatingComment}
-              multiline
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSubmitRating} disabled={savingRating}>
-                <ThemedText style={styles.saveBtnText}>{savingRating ? 'Submitting...' : 'Submit'}</ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setRateModalVisible(false)}>
-                <ThemedText style={styles.cancelBtnText}>Cancel</ThemedText>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </RNModal>
-    </ThemedView>
+        {showDatePicker && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="default"
+            onChange={(event, date) => {
+              setShowDatePicker(false);
+              if (date) setSelectedDate(date);
+            }}
+            minimumDate={new Date()}
+          />
+        )}
+      </Modal>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#f7f9fa',
-  },
+  container: { flex: 1 },
   header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#3b5998',
-    alignSelf: 'center',
-  },
-  list: {
+    alignItems: 'center',
+    paddingTop: 50,
     paddingBottom: 20,
+    paddingHorizontal: 20,
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    marginTop: 10,
-    gap: 16,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  actionBtnText: {
-    marginLeft: 6,
-    color: '#4c669f',
+  title: {
+    fontSize: 32,
     fontWeight: 'bold',
-  },
-  viewProfileBtn: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    backgroundColor: '#4c669f',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-  },
-  viewProfileBtnText: {
     color: '#fff',
-    fontWeight: 'bold',
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-end',
-    marginBottom: 10,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  addButtonText: {
-    color: '#4c669f',
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '90%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    maxHeight: '90%',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 10,
-    fontSize: 14,
-    backgroundColor: '#fff',
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-    gap: 8,
-  },
-  categoryOption: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 16,
-    marginRight: 8,
     marginBottom: 8,
   },
-  categoryOptionSelected: {
-    backgroundColor: '#4c669f',
-  },
-  categoryOptionText: {
-    color: '#333',
-    fontSize: 14,
-  },
-  categoryOptionTextSelected: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  saveBtn: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  saveBtnText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  subtitle: {
     fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
   },
-  cancelBtn: {
-    backgroundColor: '#ccc',
-    paddingVertical: 10,
+  searchContainer: {
     paddingHorizontal: 20,
-    borderRadius: 8,
+    marginBottom: 20,
   },
-  cancelBtnText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  providerInfoRow: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
-    marginTop: 6,
+    backgroundColor: '#fff',
+    borderRadius: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#333',
+  },
+  categoriesList: {
+    marginBottom: 20,
+  },
+  categoriesContainer: {
+    paddingHorizontal: 20,
+  },
+  categoryItem: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginRight: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    minWidth: 80,
+  },
+  categoryItemActive: {
+    backgroundColor: '#4b32c3',
+  },
+  categoryText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  categoryTextActive: {
+    color: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  servicesList: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+  serviceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  serviceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  providerInfo: {
+    flexDirection: 'row',
+    flex: 1,
+  },
+  providerAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#f0f0f0',
+  },
+  providerDetails: {
+    marginLeft: 12,
+    flex: 1,
   },
   providerName: {
-    fontWeight: 'bold',
     fontSize: 16,
-    color: '#3b5998',
-  },
-  trustScore: {
-    fontSize: 13,
-    color: '#4c669f',
-    marginTop: 2,
-  },
-  rateBtn: {
-    backgroundColor: '#FFD700',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    alignSelf: 'flex-start',
-    marginTop: 10,
+    fontWeight: 'bold',
+    color: '#333',
     marginBottom: 4,
   },
-  rateBtnText: {
-    color: '#3b5998',
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  rating: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  reviewCount: {
+    fontSize: 12,
+    color: '#999',
+  },
+  serviceCategory: {
+    marginLeft: 12,
+  },
+  categoryBadge: {
+    backgroundColor: '#e3f2fd',
+    color: '#1976d2',
+    fontSize: 12,
     fontWeight: 'bold',
-    fontSize: 15,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  serviceTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  serviceDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  serviceDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  priceContainer: {
+    flex: 1,
+  },
+  fixedPrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4b32c3',
+  },
+  priceRange: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4b32c3',
+  },
+  priceNegotiable: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: '#999',
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  locationText: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
+  },
+  imagesContainer: {
+    marginBottom: 16,
+  },
+  serviceImage: {
+    width: 80,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  serviceActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  contactButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(75, 50, 195, 0.1)',
+    borderWidth: 1,
+    borderColor: '#4b32c3',
+  },
+  contactButtonText: {
+    color: '#4b32c3',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  bookButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#4b32c3',
+  },
+  bookButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 60,
+    gap: 12,
+  },
+  emptyText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  emptySubtext: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
+  
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    maxHeight: '90%',
+    paddingTop: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  selectedServiceInfo: {
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 12,
+  },
+  selectedServiceCategory: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#4b32c3',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  selectedServiceTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  selectedServiceProvider: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  selectedServicePrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4b32c3',
+  },
+  inputGroup: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 12,
+  },
+  timeSlotsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeSlot: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f8f9fa',
+  },
+  timeSlotActive: {
+    backgroundColor: '#4b32c3',
+    borderColor: '#4b32c3',
+  },
+  timeSlotText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  timeSlotTextActive: {
+    color: '#fff',
+  },
+  descriptionInput: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    minHeight: 80,
+  },
+  urgencyContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  urgencyOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  urgencyOptionActive: {
+    backgroundColor: 'rgba(75, 50, 195, 0.1)',
+  },
+  urgencyText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  urgencyTextActive: {
+    color: '#4b32c3',
+  },
+  budgetInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  budgetInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 8,
+  },
+  finalBookButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#4b32c3',
+    paddingVertical: 16,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+  },
+  finalBookButtonDisabled: {
+    opacity: 0.7,
+  },
+  finalBookButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

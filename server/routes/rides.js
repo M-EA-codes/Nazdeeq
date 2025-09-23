@@ -4,6 +4,8 @@ const rideController = require('../controllers/rideController');
 
 router.post('/', rideController.createRide);
 router.get('/', rideController.getRides);
+router.get('/my-rides', rideController.getMyRides);
+router.get('/stats', rideController.getRideStats);
 router.get('/:id', rideController.getRideById);
 router.put('/:id', rideController.updateRide);
 router.delete('/:id', rideController.deleteRide);

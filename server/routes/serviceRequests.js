@@ -4,6 +4,7 @@ const serviceRequestController = require('../controllers/serviceRequestControlle
 
 router.post('/', serviceRequestController.createServiceRequest);
 router.get('/', serviceRequestController.getServiceRequests);
+router.get('/stats', serviceRequestController.getServiceRequestStats);
 router.get('/:id', serviceRequestController.getServiceRequestById);
 router.put('/:id', serviceRequestController.updateServiceRequest);
 router.delete('/:id', serviceRequestController.deleteServiceRequest);

@@ -1,194 +1,330 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { ThemedText } from '../../../components/ThemedText';
-import { ThemedView } from '../../../components/ThemedView';
+import { 
+  View, 
+  Text, // Make sure we're importing Text from react-native
+  StyleSheet, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  Alert, 
+  ScrollView,
+  Dimensions,
+  Image 
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../../api';
 
-const PROVIDER_ONBOARD_KEY = 'providerOnboarded';
+const { width } = Dimensions.get('window');
 
-export default function Dashboard({ navigation }: { navigation: { navigate: (screen: string, params?: any) => void } }) {
-  const [userType, setUserType] = useState<'provider' | 'seeker'>('seeker');
-  const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState('');
-  const [providerOnboarded, setProviderOnboarded] = useState(false);
+interface DashboardStats {
+  totalServices: number;
+  activeServices: number;
+  totalProviders: number;
+  totalBookings: number;
+}
+
+export default function NeighborWorksDashboard({ navigation }: { navigation: any }) {
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalServices: 0,
+    activeServices: 0,
+    totalProviders: 0,
+    totalBookings: 0,
+  });
 
   useEffect(() => {
-    const fetchUserType = async () => {
-      setLoading(true);
-      try {
-        const prefs = await AsyncStorage.getItem('userPreferences');
-        if (prefs) {
-          const parsed = JSON.parse(prefs);
-          setUserName(parsed?.fullName || '');
-          if (parsed.roles && parsed.roles.serviceProvider) setUserType('provider');
-          else setUserType('seeker');
-        }
-        const onboarded = await AsyncStorage.getItem(PROVIDER_ONBOARD_KEY);
-        setProviderOnboarded(onboarded === 'true');
-      } catch {}
-      setLoading(false);
-    };
-    fetchUserType();
+    fetchStats();
   }, []);
 
-  const handleToggleRole = async () => {
-    if (userType === 'seeker') {
-      // Switching to provider
-      if (!providerOnboarded) {
-        Alert.alert(
-          'Become a Service Provider',
-          'To offer services, please fill out your profile and select the services you want to offer.',
-          [
-            {
-              text: 'Proceed',
-              onPress: () => {
-                navigation.navigate('Profile', { onboarding: true });
-              },
-            },
-            { text: 'Cancel', style: 'cancel' },
-          ]
-        );
-        return;
-      }
-      // Mark as provider in preferences
-      try {
-        const prefs = await AsyncStorage.getItem('userPreferences');
-        if (prefs) {
-          const parsed = JSON.parse(prefs);
-          parsed.roles = parsed.roles || {};
-          parsed.roles.serviceProvider = true;
-          await AsyncStorage.setItem('userPreferences', JSON.stringify(parsed));
-        }
-      } catch {}
-      setUserType('provider');
-    } else {
-      // Switching to seeker
-      try {
-        const prefs = await AsyncStorage.getItem('userPreferences');
-        if (prefs) {
-          const parsed = JSON.parse(prefs);
-          parsed.roles = parsed.roles || {};
-          parsed.roles.serviceProvider = false;
-          await AsyncStorage.setItem('userPreferences', JSON.stringify(parsed));
-        }
-      } catch {}
-      setUserType('seeker');
+  const fetchStats = async () => {
+    setLoading(true);
+    try {
+      // Fetch dashboard statistics with proper error handling
+      const [servicesRes, bookingsRes] = await Promise.all([
+        api.get('/services/stats').catch(() => ({ data: { totalServices: 0, activeServices: 0 } })),
+        api.get('/service-requests/stats').catch(() => ({ data: { totalRequests: 0 } }))
+      ]);
+
+      setStats({
+        totalServices: servicesRes.data?.totalServices || 0,
+        activeServices: servicesRes.data?.activeServices || 0,
+        totalProviders: 15, // Mock data
+        totalBookings: bookingsRes.data?.totalRequests || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      // Set default values on error
+      setStats({
+        totalServices: 0,
+        activeServices: 0,
+        totalProviders: 0,
+        totalBookings: 0,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <ThemedView style={styles.container}>
-        <ActivityIndicator size="large" color="#3b5998" />
-      </ThemedView>
-    );
-  }
+  const StatCard = ({ title, value, icon, color }: { title: string; value: string | number; icon: string; color: string }) => (
+    <View style={[styles.statCard, { borderLeftColor: color }]}>
+      <MaterialIcons name={icon} size={24} color={color} style={styles.statIcon} />
+      <View style={styles.statContent}>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statTitle}>{title}</Text>
+      </View>
+    </View>
+  );
 
   return (
-    <ThemedView style={styles.container}>
-      <TouchableOpacity style={styles.button} onPress={handleToggleRole}>
-        <ThemedText style={styles.buttonText}>
-          Switch to {userType === 'provider' ? 'Service Seeker' : 'Service Provider'}
-        </ThemedText>
-      </TouchableOpacity>
-      <ThemedText type="title" style={styles.header}>{userType === 'provider' ? 'Provider Dashboard' : 'Service Seeker Dashboard'}</ThemedText>
-      <ThemedText style={styles.welcomeBlue}>Welcome{userName ? `, ${userName}` : ''}!</ThemedText>
-      {userType === 'provider' ? (
-        <>
-          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Bookings', { userType })}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>View Service Requests</ThemedText>
-            <ThemedText style={styles.cardText}>See all requests from seekers</ThemedText>
+    <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.gradient}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>NeighborWorks</Text>
+          <Text style={styles.subtitle}>Connect • Serve • Thrive in Your Community</Text>
+        </View>
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#fff" />
+            <Text style={styles.loadingText}>Loading stats...</Text>
+          </View>
+        ) : (
+          <View style={styles.statsContainer}>
+            <View style={styles.statsRow}>
+              <StatCard
+                title="Active Services"
+                value={stats.activeServices}
+                icon="build"
+                color="#4b32c3"
+              />
+              <StatCard
+                title="Total Bookings"
+                value={stats.totalBookings}
+                icon="event"
+                color="#3ad29f"
+              />
+            </View>
+            <View style={styles.statsRow}>
+              <StatCard
+                title="Service Providers"
+                value={stats.totalProviders}
+                icon="people"
+                color="#3a8fd2"
+              />
+              <StatCard
+                title="All Services"
+                value={stats.totalServices}
+                icon="work"
+                color="#ffd93d"
+              />
+            </View>
+          </View>
+        )}
+
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('ServiceList')}
+          >
+            <LinearGradient
+              colors={["#4b32c3", "#7f53ac"]}
+              style={styles.actionGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <MaterialIcons name="search" size={32} color="#fff" />
+              <Text style={styles.actionTitle}>Find Services</Text>
+              <Text style={styles.actionSubtitle}>
+                Browse and book trusted local service providers in your neighborhood
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Services')}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>My Services</ThemedText>
-            <ThemedText style={styles.cardText}>Manage your offered services</ThemedText>
+
+          <TouchableOpacity 
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('ServiceProviderDashboard')}
+          >
+            <LinearGradient
+              colors={["#3ad29f", "#2ecc71"]}
+              style={styles.actionGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <MaterialIcons name="build" size={32} color="#fff" />
+              <Text style={styles.actionTitle}>Become a Provider</Text>
+              <Text style={styles.actionSubtitle}>
+                Offer your skills and services to help your neighbors
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Reviews')}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>My Reviews</ThemedText>
-            <ThemedText style={styles.cardText}>See feedback from seekers</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Profile')}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>My Profile</ThemedText>
-            <ThemedText style={styles.cardText}>View and edit your profile</ThemedText>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <>
-          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Bookings', { userType })}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>My Bookings</ThemedText>
-            <ThemedText style={styles.cardText}>View your service requests</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Services')}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>Browse Services</ThemedText>
-            <ThemedText style={styles.cardText}>Find and book providers</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Reviews')}>
-            <ThemedText type="subtitle" style={styles.cardTitle}>My Reviews</ThemedText>
-            <ThemedText style={styles.cardText}>See your submitted reviews</ThemedText>
-          </TouchableOpacity>
-        </>
-      )}
-    </ThemedView>
+        </View>
+
+        {/* Quick Access Features */}
+        <View style={styles.featuresContainer}>
+          <Text style={styles.featuresTitle}>Popular Services</Text>
+          
+          <View style={styles.featuresGrid}>
+            {[
+              { name: 'Plumbing', icon: 'plumbing', color: '#3a8fd2' },
+              { name: 'Cleaning', icon: 'cleaning-services', color: '#3ad29f' },
+              { name: 'Gardening', icon: 'grass', color: '#4caf50' },
+              { name: 'Electrical', icon: 'electrical-services', color: '#ffd93d' },
+            ].map((feature, index) => (
+              <TouchableOpacity 
+                key={index}
+                style={styles.featureCard}
+                onPress={() => navigation.navigate('ServiceList', { category: feature.name.toLowerCase() })}
+              >
+                <View style={[styles.featureIcon, { backgroundColor: feature.color }]}>
+                  <MaterialIcons name={feature.icon} size={24} color="#fff" />
+                </View>
+                <Text style={styles.featureName}>{feature.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#f7f9fa',
+  gradient: { flex: 1 },
+  container: { 
+    flexGrow: 1, 
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   header: {
-    fontSize: 24,
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  title: {
+    fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#3b5998',
-    alignSelf: 'center',
+    color: '#fff',
+    marginBottom: 8,
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
-  welcome: {
+  subtitle: {
     fontSize: 16,
-    marginBottom: 18,
-    color: '#444',
-    alignSelf: 'center',
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    lineHeight: 22,
   },
-  welcomeBlue: {
+  loadingContainer: {
+    alignItems: 'center',
+    marginVertical: 40,
+    gap: 12,
+  },
+  loadingText: {
+    color: '#fff',
     fontSize: 16,
-    marginBottom: 18,
-    color: '#3b5998',
-    alignSelf: 'center',
-    fontWeight: 'bold',
+    fontWeight: '500',
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+  statsContainer: {
+    marginBottom: 30,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 4,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 4,
   },
-  cardTitle: {
-    color: '#3b5998',
+  statIcon: {
+    marginRight: 12,
+  },
+  statContent: {
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 20,
     fontWeight: 'bold',
-    fontSize: 17,
+    color: '#23235b',
     marginBottom: 2,
   },
-  cardText: {
-    color: '#3b5998',
-    fontSize: 15,
+  statTitle: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
   },
-  button: {
-    backgroundColor: '#3b5998',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+  actionsContainer: {
+    gap: 16,
+    marginBottom: 30,
+  },
+  actionCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  actionGradient: {
+    padding: 24,
     alignItems: 'center',
-    marginTop: 16,
   },
-  buttonText: {
-    color: '#fff',
+  actionTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
-    fontSize: 16,
+    color: '#fff',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  actionSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  featuresContainer: {
+    marginTop: 20,
+  },
+  featuresTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  featuresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  featureCard: {
+    width: (width - 56) / 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+  },
+  featureIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  featureName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
   },
 });
