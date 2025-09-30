@@ -25,6 +25,13 @@ export default function AuthScreen() {
     profilePhoto: ''
   });
   const [imagePreview, setImagePreview] = useState('');
+
+  // Log configuration on component mount
+  React.useEffect(() => {
+    console.log('🔧 AUTH: Component mounted');
+    console.log('🔧 AUTH: API_URL from config:', API_URL);
+    console.log('🔧 AUTH: config object:', config);
+  }, []);
 // Remove this duplicate declaration since error state is already declared below
 
   const pickProfilePhoto = async () => {
@@ -47,41 +54,102 @@ export default function AuthScreen() {
 
   const handleSubmit = async () => {
     try {
+      console.log('🔐 AUTH: Starting authentication process');
+      console.log('🔐 AUTH: Mode:', isLogin ? 'LOGIN' : 'REGISTER');
+      console.log('🔐 AUTH: API_URL:', API_URL);
+      
       setError('');
-      if (!isLogin && formData.password !== formData.confirmPassword) {
-        setError('Passwords do not match');
+      
+      // Validation
+      if (!formData.email.trim()) {
+        console.log('❌ AUTH: Email is required');
+        setError('Email is required');
         return;
+      }
+      
+      if (!formData.password.trim()) {
+        console.log('❌ AUTH: Password is required');
+        setError('Password is required');
+        return;
+      }
+      
+      if (!isLogin) {
+        if (!formData.fullName.trim()) {
+          console.log('❌ AUTH: Full name is required for registration');
+          setError('Full name is required');
+          return;
+        }
+        
+        if (!formData.phoneNumber.trim()) {
+          console.log('❌ AUTH: Phone number is required for registration');
+          setError('Phone number is required');
+          return;
+        }
+        
+        if (formData.password !== formData.confirmPassword) {
+          console.log('❌ AUTH: Passwords do not match');
+          setError('Passwords do not match');
+          return;
+        }
       }
 
       const endpoint = isLogin ? '/login' : '/register';
-      const response = await axios.post(`${API_URL}${endpoint}`, formData);
+      const fullUrl = `${API_URL}${endpoint}`;
+      
+      console.log('🔐 AUTH: Making request to:', fullUrl);
+      console.log('🔐 AUTH: Request data:', {
+        ...formData,
+        password: '[HIDDEN]',
+        confirmPassword: '[HIDDEN]'
+      });
+
+      const response = await axios.post(fullUrl, formData);
+      
+      console.log('✅ AUTH: Server response received');
+      console.log('✅ AUTH: Response status:', response.status);
+      console.log('✅ AUTH: Response data:', {
+        ...response.data,
+        token: response.data.token ? '[TOKEN_RECEIVED]' : 'NO_TOKEN'
+      });
 
       if (response.data.token) {
+        console.log('✅ AUTH: Token received, storing in AsyncStorage');
         await AsyncStorage.setItem('userToken', response.data.token);
+        
         if (response.data.userId) {
-
+          console.log('✅ AUTH: UserId received, storing in AsyncStorage');
           await AsyncStorage.setItem('userId', response.data.userId);
         }
+        
         // Check if this is a new user registration
         if (!isLogin) {
-          // For new users, redirect to onboarding
+          console.log('🔀 AUTH: New user registration, redirecting to onboarding');
           router.replace('/(auth)/onboarding');
         } else {
           // For returning users, check if they've completed onboarding
           const userPreferences = await AsyncStorage.getItem('userPreferences');
           if (userPreferences) {
-            // User has completed onboarding, go to dashboard
+            console.log('🔀 AUTH: Returning user with preferences, redirecting to home');
             router.replace('/(tabs)/home');
           } else {
-            // User hasn't completed onboarding yet
+            console.log('🔀 AUTH: Returning user without preferences, redirecting to onboarding');
             router.replace('/(auth)/onboarding');
           }
         }
+      } else {
+        console.log('❌ AUTH: No token received in response');
+        setError('Authentication failed: No token received');
       }
-    } catch (err) {
-      setError(
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'An error occurred'
-      );
+    } catch (err: any) {
+      console.log('❌ AUTH: Error occurred during authentication');
+      console.log('❌ AUTH: Error object:', err);
+      console.log('❌ AUTH: Error message:', err.message);
+      console.log('❌ AUTH: Error response:', err.response?.data);
+      console.log('❌ AUTH: Error status:', err.response?.status);
+      
+      const errorMessage = err.response?.data?.message || err.message || 'An error occurred during authentication';
+      console.log('❌ AUTH: Setting error message:', errorMessage);
+      setError(errorMessage);
     }
   };
 

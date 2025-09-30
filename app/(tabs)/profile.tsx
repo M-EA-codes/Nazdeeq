@@ -17,6 +17,8 @@ export default function ProfileScreen() {
   const [address, setAddress] = useState('');
   const [email, setEmail] = useState('');
   const [profilePhoto, setProfilePhoto] = useState('');
+    const [interests, setInterests] = useState<string[]>([]);
+    const [interestInput, setInterestInput] = useState('');
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -52,6 +54,18 @@ export default function ProfileScreen() {
         setPhone(data.phoneNumber || '');
         setAddress(data.address || '');
         setProfilePhoto(data.profilePhoto || '');
+          // Fetch user interests
+          const interestsRes = await fetch(`${config.API_URL}/users/${userId}/interests`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (interestsRes.ok) {
+            const interestsData = await interestsRes.json();
+            setInterests(interestsData.interests || []);
+          }
       } catch (err) {
         console.error('Failed to load user info:', err);
         Alert.alert('Error', 'Failed to load user information');
@@ -114,6 +128,20 @@ export default function ProfileScreen() {
     if (status !== 'granted') {
       Alert.alert('Permission required', 'Permission to access gallery is required!');
       return;
+              // Update interests
+              const interestsRes = await fetch(`${config.API_URL}/users/${userId}/interests`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ interests })
+              });
+              if (!interestsRes.ok) {
+                const errText = await interestsRes.text();
+                console.error('Interests update failed:', errText);
+                throw new Error('Failed to update interests');
+              }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -123,6 +151,18 @@ export default function ProfileScreen() {
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setProfilePhoto(result.assets[0].uri);
     }
+  };
+
+  // Add/remove interests handlers
+  const handleAddInterest = () => {
+    const trimmed = interestInput.trim();
+    if (trimmed && !interests.includes(trimmed)) {
+      setInterests([...interests, trimmed]);
+      setInterestInput('');
+    }
+  };
+  const handleRemoveInterest = (interest: string) => {
+    setInterests(interests.filter(i => i !== interest));
   };
 
   return (
@@ -173,6 +213,41 @@ export default function ProfileScreen() {
             )}
           </View>
         </View>
+
+          {/* Interests Section */}
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Interests</ThemedText>
+            <View style={styles.interestsContainer}>
+              {interests.length === 0 && !editable && (
+                <ThemedText style={{ opacity: 0.7 }}>No interests added yet.</ThemedText>
+              )}
+              {interests.map((interest, idx) => (
+                <View key={idx} style={styles.interestChip}>
+                  <ThemedText style={styles.interestText}>{interest}</ThemedText>
+                  {editable && (
+                    <TouchableOpacity onPress={() => handleRemoveInterest(interest)}>
+                      <ThemedText style={styles.removeInterest}>×</ThemedText>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+              {editable && (
+                <View style={styles.addInterestRow}>
+                  <TextInput
+                    style={styles.input}
+                    value={interestInput}
+                    onChangeText={setInterestInput}
+                    placeholder="Add interest (e.g. Chess)"
+                    onSubmitEditing={handleAddInterest}
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity style={styles.addInterestBtn} onPress={handleAddInterest}>
+                    <ThemedText style={{ color: '#fff', fontWeight: 'bold' }}>Add</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
 
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Other Settings</ThemedText>
@@ -244,6 +319,45 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logoutText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+    interestsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      marginTop: 8,
+      marginBottom: 8,
+    },
+    interestChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#e0e7ef',
+      borderRadius: 16,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    interestText: {
+      fontSize: 15,
+      marginRight: 4,
+    },
+    removeInterest: {
+      color: '#e74c3c',
+      fontWeight: 'bold',
+      fontSize: 18,
+      marginLeft: 2,
+    },
+    addInterestRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    addInterestBtn: {
+      backgroundColor: '#4c669f',
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      marginLeft: 8,
+    },
   photoButton: {
     backgroundColor: '#4c669f',
     paddingVertical: 10,

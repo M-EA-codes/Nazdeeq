@@ -1,3 +1,19 @@
+// Search users by interest
+exports.searchUsersByInterest = async (req, res) => {
+  try {
+    const interest = req.query.interest;
+    if (!interest || typeof interest !== 'string') {
+      return res.status(400).json({ error: 'Interest query parameter is required.' });
+    }
+    // Case-insensitive search for users whose interests array contains the interest
+    const users = await User.find({
+      interests: { $regex: new RegExp(interest, 'i') }
+    }).select('-password');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 const User = require('../models/User');
 
 exports.createUser = async (req, res) => {
@@ -30,6 +46,7 @@ exports.getUserById = async (req, res) => {
   }
 };
 
+
 exports.updateUser = async (req, res) => {
   try {
     // Only update allowed fields
@@ -45,6 +62,35 @@ exports.updateUser = async (req, res) => {
     res.json(user);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+
+// Update user interests
+exports.updateUserInterests = async (req, res) => {
+  try {
+    if (!Array.isArray(req.body.interests)) {
+      return res.status(400).json({ error: 'Interests must be an array of strings.' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { interests: req.body.interests },
+      { new: true }
+    ).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ interests: user.interests });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// Get user interests
+exports.getUserInterests = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('interests');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ interests: user.interests });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
