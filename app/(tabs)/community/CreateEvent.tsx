@@ -72,10 +72,23 @@ export default function CreateEvent({ route, navigation }: { route: any; navigat
       setSelectedGroupId(newGroupId);
       // Refresh groups list to include the new group
       if (userId) {
+        console.log('🔄 CREATE_EVENT: Refreshing groups after new group creation');
         fetchGroups();
       }
     }
   }, [route.params, userId]);
+
+  // Refresh groups when component comes into focus (when returning from CreateGroup)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('🔄 CREATE_EVENT: Screen focused, refreshing groups');
+      if (userId) {
+        fetchGroups();
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, userId]);
 
   const fetchUserData = async () => {
     try {
@@ -94,17 +107,23 @@ export default function CreateEvent({ route, navigation }: { route: any; navigat
 
   const fetchGroups = async () => {
     try {
+      console.log('📋 CREATE_EVENT: Fetching groups for user:', userId);
       const response = await api.get('/groups');
       const allGroups = response.data || [];
+      console.log('📋 CREATE_EVENT: All groups received:', allGroups.length);
       
       // Filter groups where user is member or creator
-      const userGroups = allGroups.filter((group: Group) =>
-        group.memberIds?.includes(userId || '') || group.createdBy === userId
-      );
+      const userGroups = allGroups.filter((group: Group) => {
+        const isMember = group.memberIds?.includes(userId || '');
+        const isCreator = group.createdBy?._id === userId || group.createdBy === userId;
+        console.log(`📋 CREATE_EVENT: Group "${group.name}" - isMember: ${isMember}, isCreator: ${isCreator}`);
+        return isMember || isCreator;
+      });
       
+      console.log('📋 CREATE_EVENT: User groups filtered:', userGroups.length);
       setGroups(userGroups);
     } catch (error) {
-      console.error('Error fetching groups:', error);
+      console.error('❌ CREATE_EVENT: Error fetching groups:', error);
     }
   };
 
@@ -368,7 +387,18 @@ export default function CreateEvent({ route, navigation }: { route: any; navigat
 
           {/* Group Selection */}
           <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Select Group *</ThemedText>
+            <View style={styles.groupHeader}>
+              <ThemedText style={styles.label}>Select Group *</ThemedText>
+              <TouchableOpacity 
+                style={styles.refreshButton}
+                onPress={() => {
+                  console.log('🔄 CREATE_EVENT: Manual refresh groups button pressed');
+                  fetchGroups();
+                }}
+              >
+                <MaterialIcons name="refresh" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
             {groups.length > 0 ? (
               <View style={styles.groupSelector}>
                 {groups.map((group) => (
@@ -534,6 +564,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 10,
     flex: 1,
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  refreshButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   groupSelector: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',

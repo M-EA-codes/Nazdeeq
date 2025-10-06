@@ -12,7 +12,9 @@ exports.createDiscussion = async (req, res) => {
 
 exports.getDiscussions = async (req, res) => {
   try {
-    const discussions = await Discussion.find();
+    const discussions = await Discussion.find()
+      .populate('authorId', 'fullName profilePhoto')
+      .sort({ created_at: -1 });
     res.json(discussions);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -21,7 +23,8 @@ exports.getDiscussions = async (req, res) => {
 
 exports.getDiscussionById = async (req, res) => {
   try {
-    const discussion = await Discussion.findById(req.params.id);
+    const discussion = await Discussion.findById(req.params.id)
+      .populate('authorId', 'fullName profilePhoto');
     if (!discussion) return res.status(404).json({ error: 'Discussion not found' });
     res.json(discussion);
   } catch (err) {

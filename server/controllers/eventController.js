@@ -2,10 +2,16 @@ const Event = require('../models/Event');
 
 exports.createEvent = async (req, res) => {
   try {
+    console.log('🎯 SERVER: Creating event');
+    console.log('🎯 SERVER: Event data:', req.body);
+    
     const event = new Event(req.body);
     await event.save();
+    
+    console.log('✅ SERVER: Event created successfully:', event._id);
     res.status(201).json(event);
   } catch (err) {
+    console.log('❌ SERVER: Error creating event:', err.message);
     res.status(400).json({ error: err.message });
   }
 };

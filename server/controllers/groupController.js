@@ -22,6 +22,7 @@ exports.createGroup = async (req, res) => {
 
 exports.getGroups = async (req, res) => {
   try {
+    console.log('📋 SERVER: Fetching groups');
     const { search } = req.query;
     let query = {};
     
@@ -38,8 +39,10 @@ exports.getGroups = async (req, res) => {
       .populate('memberIds', 'fullName profilePhoto')
       .sort({ created_at: -1 });
     
+    console.log('✅ SERVER: Groups fetched successfully:', groups.length);
     res.json(groups);
   } catch (err) {
+    console.log('❌ SERVER: Error fetching groups:', err.message);
     res.status(500).json({ error: err.message });
   }
 };

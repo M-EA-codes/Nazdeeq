@@ -121,9 +121,14 @@ export default function DiscussionsList({ route, navigation }: { route: any; nav
                 {discussion.content}
               </ThemedText>
               <View style={styles.discussionFooter}>
-                <ThemedText style={styles.discussionDate}>
-                  {new Date(discussion.created_at).toLocaleDateString()}
-                </ThemedText>
+                <View style={styles.discussionMeta}>
+                  <ThemedText style={styles.discussionAuthor}>
+                    by {discussion.authorId?.fullName || 'Unknown User'}
+                  </ThemedText>
+                  <ThemedText style={styles.discussionDate}>
+                    {new Date(discussion.created_at).toLocaleDateString()}
+                  </ThemedText>
+                </View>
                 <MaterialIcons name="arrow-forward-ios" size={16} color="rgba(255, 255, 255, 0.6)" />
               </View>
             </TouchableOpacity>
@@ -170,5 +175,14 @@ const styles = StyleSheet.create({
   discussionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
   discussionContent: { color: 'rgba(255, 255, 255, 0.8)', fontSize: 14, marginBottom: 15 },
   discussionFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  discussionMeta: {
+    flex: 1,
+  },
+  discussionAuthor: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   discussionDate: { color: 'rgba(255, 255, 255, 0.6)', fontSize: 12 },
 });

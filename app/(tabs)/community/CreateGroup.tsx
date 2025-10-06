@@ -109,6 +109,12 @@ export default function CreateGroup({ route, navigation }: { route: any; navigat
       // Check if we came from CreateEvent (need to go back there)
       const { fromScreen } = route.params || {};
       
+      // Clear the form fields
+      setGroupData({
+        name: '',
+        description: ''
+      });
+
       Alert.alert(
         'Success!', 
         'Your group has been created successfully',
