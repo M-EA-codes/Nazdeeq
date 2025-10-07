@@ -49,6 +49,7 @@ export default function TabLayout() {
             />
           ),
         }}
+        initialParams={{ screen: 'Dashboard' }}
       />
       <Tabs.Screen
         name="neighborWorks"

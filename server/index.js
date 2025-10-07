@@ -6,18 +6,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const userRoutes = require('./routes/users');
-const groupRoutes = require('./routes/groups');
-const discussionRoutes = require('./routes/discussions');
-const commentRoutes = require('./routes/comments');
 const chatRoutes = require('./routes/chats');
 const messageRoutes = require('./routes/messages');
-const pollRoutes = require('./routes/polls');
 const rideRoutes = require('./routes/rides');
 const rideRequestRoutes = require('./routes/rideRequests');
-const eventRoutes = require('./routes/events');
 const serviceRoutes = require('./routes/services');
 const serviceRequestRoutes = require('./routes/serviceRequests');
 const neighborWorksRoutes = require('./routes/neighborWorks');
+const vibeTribeRoutes = require('./routes/vibeTribe');
+const connectionRoutes = require('./routes/connections');
 
 // Middleware
 const app = express();
@@ -99,10 +96,8 @@ app.post('/api/register', async (req, res) => {
       address: address || '',
       roles: roles || { serviceSeeker: true, serviceProvider: false },
       serviceCategories: serviceCategories || [],
-      profilePhoto: profilePhoto || '',
-      rating: 0,
-      completedOrders: 0,
-      reviews: []
+      profilePhoto: profilePhoto || ''
+      // Let rating, completedRides, trustScore, etc. use their model defaults
     });
 
     console.log('💾 SERVER: Saving user to database');
@@ -192,17 +187,14 @@ app.post('/api/login', async (req, res) => {
 
 app.use('/api/neighbor-works', neighborWorksRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/groups', groupRoutes);
-app.use('/api/discussions', discussionRoutes);
-app.use('/api/comments', commentRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/messages', messageRoutes);
-app.use('/api/polls', pollRoutes);
 app.use('/api/rides', rideRoutes);
 app.use('/api/ride-requests', rideRequestRoutes);
-app.use('/api/events', eventRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/service-requests', serviceRequestRoutes);
+app.use('/api/vibe-tribe', vibeTribeRoutes);
+app.use('/api/connections', connectionRoutes);
 // Environment variable validation
 console.log('🔧 SERVER: Checking environment variables...');
 console.log('🔧 SERVER: MONGODB_URI:', process.env.MONGODB_URI ? 'SET' : 'NOT_SET');

@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // DEVELOPMENT MODE: Open access
+    // TODO: Implement proper auth rules when you add Firebase Authentication
+    
+    // Conversations collection
+    match /conversations/{conversationId} {
+      // Allow all operations for development
+      allow read, write, create, update: if true;
+      allow delete: if false; // Never allow hard deletes
+    }
+    
+    // Messages collection
+    match /messages/{messageId} {
+      // Allow all operations for development
+      allow read, write, create, update: if true;
+      allow delete: if false; // Never allow hard deletes
+    }
+  }
+}
+
+// PRODUCTION RULES (Use when you add Firebase Auth):
+// 
+// service cloud.firestore {
+//   match /databases/{database}/documents {
+//     
+//     function isSignedIn() {
+//       return request.auth != null;
+//     }
+//     
+//     function isConversationParticipant(conversationId) {
+//       return request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+//     }
+//     
+//     match /conversations/{conversationId} {
+//       allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
+//       allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
+//       allow update: if isSignedIn() && request.auth.uid in resource.data.participants;
+//       allow delete: if false;
+//     }
+//     
+//     match /messages/{messageId} {
+//       allow read: if isSignedIn() && isConversationParticipant(resource.data.conversationId);
+//       allow create: if isSignedIn() && request.auth.uid == request.resource.data.senderId;
+//       allow update: if isSignedIn() && request.auth.uid == resource.data.senderId;
+//       allow delete: if false;
+//     }
+//   }
+// }
+

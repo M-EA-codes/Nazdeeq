@@ -1,21 +1,17 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import CommunityDashboard from './Dashboard';
-import EventsList from './EventsList';
-import CreateEvent from './CreateEvent';
-import EventDetails from './EventDetails';
-import GroupsList from './GroupsList';
-import CreateGroup from './CreateGroup';
-import GroupDetails from './GroupDetails';
-import DiscussionsList from './DiscussionsList';
-import CreateDiscussion from './CreateDiscussion';
-import DiscussionDetails from './DiscussionDetails';
-import PollDetails from './PollDetails';
-import CreatePoll from './CreatePoll';
+import Dashboard from './Dashboard';
+import InterestSelection from './InterestSelection';
+import MatchedUsers from './MatchedUsers';
+import UserProfile from './UserProfile';
+import ConnectionsList from './ConnectionsList';
+import ConnectionRequests from './ConnectionRequests';
+import ConversationsList from './ConversationsList';
+import ChatScreen from './ChatScreen';
 
 const Stack = createNativeStackNavigator();
 
-export default function CommunityLayout() {
+function StackNavigator() {
   return (
     <Stack.Navigator 
       initialRouteName="Dashboard"
@@ -27,72 +23,55 @@ export default function CommunityLayout() {
     >
       <Stack.Screen 
         name="Dashboard" 
-        component={CommunityDashboard} 
+        component={Dashboard} 
         options={{ title: 'VibeTribe' }} 
       />
       
-      {/* Events Screens */}
       <Stack.Screen 
-        name="EventsList" 
-        component={EventsList} 
-        options={{ title: 'Community Events' }} 
-      />
-      <Stack.Screen 
-        name="CreateEvent" 
-        component={CreateEvent} 
-        options={{ title: 'Create Event' }} 
-      />
-      <Stack.Screen 
-        name="EventDetails" 
-        component={EventDetails} 
-        options={{ title: 'Event Details' }} 
+        name="InterestSelection" 
+        component={InterestSelection} 
+        options={{ title: 'Choose Interests' }} 
       />
       
-      {/* Groups Screens */}
       <Stack.Screen 
-        name="GroupsList" 
-        component={GroupsList} 
-        options={{ title: 'Community Groups' }} 
-      />
-      <Stack.Screen 
-        name="CreateGroup" 
-        component={CreateGroup} 
-        options={{ title: 'Create Group' }} 
-      />
-      <Stack.Screen 
-        name="GroupDetails" 
-        component={GroupDetails} 
-        options={{ title: 'Group Details' }} 
+        name="MatchedUsers" 
+        component={MatchedUsers} 
+        options={{ title: 'Your Matches' }} 
       />
       
-      {/* Discussions Screens */}
       <Stack.Screen 
-        name="DiscussionsList" 
-        component={DiscussionsList} 
-        options={{ title: 'Discussions' }} 
+        name="UserProfile" 
+        component={UserProfile} 
+        options={{ title: 'User Profile' }} 
       />
+
       <Stack.Screen 
-        name="CreateDiscussion" 
-        component={CreateDiscussion} 
-        options={{ title: 'Start Discussion' }} 
+        name="ConnectionsList" 
+        component={ConnectionsList} 
+        options={{ title: 'My Connections' }} 
       />
+
       <Stack.Screen 
-        name="DiscussionDetails" 
-        component={DiscussionDetails} 
-        options={{ title: 'Discussion' }} 
+        name="ConnectionRequests" 
+        component={ConnectionRequests} 
+        options={{ title: 'Connection Requests' }} 
       />
-      
-      {/* Polls Screens */}
+
       <Stack.Screen 
-        name="PollDetails" 
-        component={PollDetails} 
-        options={{ title: 'Poll Details' }} 
+        name="ConversationsList" 
+        component={ConversationsList} 
+        options={{ title: 'Messages' }} 
       />
+
       <Stack.Screen 
-        name="CreatePoll" 
-        component={CreatePoll} 
-        options={{ title: 'Create Poll' }} 
+        name="ChatScreen" 
+        component={ChatScreen} 
+        options={{ title: 'Chat' }} 
       />
     </Stack.Navigator>
   );
+}
+
+export default function CommunityLayout() {
+  return <StackNavigator />;
 }

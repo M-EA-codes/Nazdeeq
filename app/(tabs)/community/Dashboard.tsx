@@ -6,7 +6,7 @@ import {
   TouchableOpacity, 
   RefreshControl,
   Alert,
-  Dimensions
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from '@/components/ThemedText';
@@ -19,26 +19,16 @@ import { useNavigation } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
 const api = axios.create({ baseURL: config.API_URL });
 
-interface CommunityStats {
-  upcomingEvents: number;
-  myGroups: number;
-  activeDiscussions: number;
-  totalMembers: number;
-}
-
-export default function CommunityDashboard() {
+export default function VibeTribeDashboard() {
   const navigation = useNavigation();
-  const [stats, setStats] = useState<CommunityStats>({
-    upcomingEvents: 0,
-    myGroups: 0,
-    activeDiscussions: 0,
-    totalMembers: 0
-  });
+  const [userId, setUserId] = useState<string | null>(null);
+  const [setupCompleted, setSetupCompleted] = useState(false);
+  const [userInterests, setUserInterests] = useState<string[]>([]);
+  const [matchCount, setMatchCount] = useState(0);
+  const [connectionsCount, setConnectionsCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [recentEvents, setRecentEvents] = useState([]);
-  const [myGroups, setMyGroups] = useState([]);
 
   useEffect(() => {
     fetchUserData();
@@ -66,39 +56,45 @@ export default function CommunityDashboard() {
   };
 
   const fetchDashboardData = async () => {
+    if (!userId) return;
+
     try {
       setLoading(true);
 
-      // Fetch events
-      const eventsResponse = await api.get('/events');
-      const events = eventsResponse.data || [];
-      const upcomingEvents = events.filter((event: any) => new Date(event.dateTime) > new Date());
+      // Get user interests and setup status
+      const userResponse = await api.get(`/vibe-tribe/interests/${userId}`);
+      if (userResponse.data.success) {
+        setSetupCompleted(userResponse.data.user.vibeTribeSetupCompleted);
+        setUserInterests(userResponse.data.user.vibeTribeInterests || []);
 
-      // Fetch groups
-      const groupsResponse = await api.get('/groups');
-      const allGroups = groupsResponse.data || [];
-      const userGroups = allGroups.filter((group: any) => 
-        group.memberIds?.includes(userId) || group.createdBy === userId
-      );
+        // If setup is completed, fetch match count and connection stats
+        if (userResponse.data.user.vibeTribeSetupCompleted) {
+          try {
+            const matchesResponse = await api.get(`/vibe-tribe/matches/${userId}`, {
+              params: { limit: 100 },
+            });
+            if (matchesResponse.data.success) {
+              setMatchCount(matchesResponse.data.totalMatches);
+            }
+          } catch (error) {
+            console.log('No matches yet or error fetching matches');
+            setMatchCount(0);
+          }
 
-      // Fetch discussions
-      const discussionsResponse = await api.get('/discussions');
-      const discussions = discussionsResponse.data || [];
-
-      // Calculate stats
-      setStats({
-        upcomingEvents: upcomingEvents.length,
-        myGroups: userGroups.length,
-        activeDiscussions: discussions.length,
-        totalMembers: allGroups.reduce((total: number, group: any) => total + (group.memberIds?.length || 0), 0)
-      });
-
-      setRecentEvents(upcomingEvents.slice(0, 3));
-      setMyGroups(userGroups.slice(0, 3));
-
+          // Fetch connection stats
+          try {
+            const statsResponse = await api.get(`/connections/stats/${userId}`);
+            if (statsResponse.data.success) {
+              setConnectionsCount(statsResponse.data.stats.totalConnections);
+              setPendingRequestsCount(statsResponse.data.stats.pendingReceived);
+            }
+          } catch (error) {
+            console.log('Error fetching connection stats');
+          }
+        }
+      }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      Alert.alert('Error', 'Failed to load community data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -110,21 +106,82 @@ export default function CommunityDashboard() {
     setRefreshing(false);
   };
 
-  const StatCard = ({ icon, title, value, color, onPress }: any) => (
-    <TouchableOpacity style={styles.statCard} onPress={onPress}>
+  const handleGetStarted = () => {
+    navigation.navigate('InterestSelection');
+  };
+
+  const handleViewMatches = () => {
+    navigation.navigate('MatchedUsers');
+  };
+
+  const handleUpdateInterests = () => {
+    navigation.navigate('InterestSelection');
+  };
+
+  // If not set up, show onboarding
+  if (!loading && !setupCompleted) {
+    return (
+      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Onboarding Header */}
+          <View style={styles.onboardingHeader}>
+            <FontAwesome5 name="users" size={80} color="#fff" />
+            <ThemedText style={styles.onboardingTitle}>Welcome to VibeTribe!</ThemedText>
+            <ThemedText style={styles.onboardingSubtitle}>
+              Connect with neighbors who share your interests
+            </ThemedText>
+          </View>
+
+          {/* Features */}
+          <View style={styles.featuresContainer}>
+            <View style={styles.featureCard}>
+              <FontAwesome5 name="heart" size={30} color="#e74c3c" />
+              <ThemedText style={styles.featureTitle}>Match by Interests</ThemedText>
+              <ThemedText style={styles.featureText}>
+                Find neighbors with similar hobbies and passions
+              </ThemedText>
+            </View>
+
+            <View style={styles.featureCard}>
+              <FontAwesome5 name="users" size={30} color="#3498db" />
+              <ThemedText style={styles.featureTitle}>Build Connections</ThemedText>
+              <ThemedText style={styles.featureText}>
+                Connect with like-minded people in your community
+              </ThemedText>
+            </View>
+
+            <View style={styles.featureCard}>
+              <FontAwesome5 name="comments" size={30} color="#2ecc71" />
+              <ThemedText style={styles.featureTitle}>Start Conversations</ThemedText>
+              <ThemedText style={styles.featureText}>
+                Message and engage with your matches (coming soon)
+              </ThemedText>
+            </View>
+          </View>
+
+          {/* Get Started Button */}
+          <TouchableOpacity
+            style={styles.getStartedButton}
+            onPress={handleGetStarted}
+          >
       <LinearGradient
-        colors={[color, color + '80']}
-        style={styles.statGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <FontAwesome5 name={icon} size={24} color="#fff" />
-        <ThemedText style={styles.statValue}>{value}</ThemedText>
-        <ThemedText style={styles.statTitle}>{title}</ThemedText>
+              colors={['#2ecc71', '#27ae60']}
+              style={styles.getStartedGradient}
+            >
+              <MaterialIcons name="navigate-next" size={28} color="#fff" />
+              <ThemedText style={styles.getStartedText}>Get Started</ThemedText>
       </LinearGradient>
     </TouchableOpacity>
+        </ScrollView>
+      </LinearGradient>
   );
+  }
 
+  // Main Dashboard (after setup)
   return (
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
       <ScrollView
@@ -137,70 +194,101 @@ export default function CommunityDashboard() {
           <FontAwesome5 name="users" size={40} color="#fff" />
           <ThemedText style={styles.headerTitle}>VibeTribe</ThemedText>
           <ThemedText style={styles.headerSubtitle}>
-            Connect • Engage • Build Community
+            Connect with Like-Minded Neighbors
           </ThemedText>
         </View>
 
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <StatCard
-            icon="calendar-alt"
-            title="Upcoming Events"
-            value={stats.upcomingEvents}
-            color="#e74c3c"
-            onPress={() => navigation.navigate('EventsList')}
-          />
-          <StatCard
-            icon="users"
-            title="My Groups"
-            value={stats.myGroups}
-            color="#3498db"
-            onPress={() => navigation.navigate('GroupsList')}
-          />
-          <StatCard
-            icon="comments"
-            title="Discussions"
-            value={stats.activeDiscussions}
-            color="#2ecc71"
-            onPress={() => navigation.navigate('DiscussionsList')}
-          />
-          <StatCard
-            icon="heart"
-            title="Total Members"
-            value={stats.totalMembers}
-            color="#f39c12"
-            onPress={() => {}}
-          />
+        {/* Stats Card */}
+        <View style={styles.statsCard}>
+          <View style={styles.statItem}>
+            <FontAwesome5 name="heart" size={30} color="#e74c3c" />
+            <ThemedText style={styles.statValue}>{userInterests.length}</ThemedText>
+            <ThemedText style={styles.statLabel}>Interests</ThemedText>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <FontAwesome5 name="user-friends" size={30} color="#2ecc71" />
+            <ThemedText style={styles.statValue}>{matchCount}</ThemedText>
+            <ThemedText style={styles.statLabel}>Matches</ThemedText>
+          </View>
+          <View style={styles.statDivider} />
+          <TouchableOpacity 
+            style={styles.statItem}
+            onPress={() => navigation.navigate('ConnectionsList')}
+          >
+            <FontAwesome5 name="link" size={30} color="#3498db" />
+            <ThemedText style={styles.statValue}>{connectionsCount}</ThemedText>
+            <ThemedText style={styles.statLabel}>Connected</ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        {/* Pending Requests Banner */}
+        {pendingRequestsCount > 0 && (
+          <TouchableOpacity
+            style={styles.requestsBanner}
+            onPress={() => navigation.navigate('ConnectionRequests')}
+          >
+            <MaterialIcons name="notifications-active" size={24} color="#fff" />
+            <ThemedText style={styles.requestsBannerText}>
+              You have {pendingRequestsCount} pending connection request{pendingRequestsCount !== 1 ? 's' : ''}
+            </ThemedText>
+            <MaterialIcons name="arrow-forward" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
+
+        {/* Your Interests */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <ThemedText style={styles.sectionTitle}>Your Interests</ThemedText>
+            <TouchableOpacity onPress={handleUpdateInterests}>
+              <MaterialIcons name="edit" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.interestsContainer}>
+            {userInterests.map((interest, index) => (
+              <View key={index} style={styles.interestTag}>
+                <ThemedText style={styles.interestTagText}>
+                  {interest.charAt(0).toUpperCase() + interest.slice(1)}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.actionsContainer}>
-          <ThemedText style={styles.sectionTitle}>Quick Actions</ThemedText>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={handleViewMatches}
+          >
+            <LinearGradient
+              colors={['#ff6b6b', '#ee5a24']}
+              style={styles.actionGradient}
+            >
+              <FontAwesome5 name="users" size={32} color="#fff" />
+              <View style={styles.actionContent}>
+                <ThemedText style={styles.actionTitle}>View Matches</ThemedText>
+                <ThemedText style={styles.actionSubtitle}>
+                  {matchCount} potential connections found
+                </ThemedText>
+              </View>
+              <MaterialIcons name="arrow-forward" size={24} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.actionCard}
-            onPress={() => {
-              console.log('🎯 DASHBOARD: Create Event button pressed');
-              console.log('🎯 DASHBOARD: Navigation object:', navigation);
-              try {
-                navigation.navigate('CreateEvent');
-                console.log('✅ DASHBOARD: Navigation to CreateEvent successful');
-              } catch (error) {
-                console.log('❌ DASHBOARD: Navigation error:', error);
-              }
-            }}
+            onPress={handleUpdateInterests}
           >
             <LinearGradient
-              colors={["#ff6b6b", "#ee5a24"]}
+              colors={['#4b7bec', '#3742fa']}
               style={styles.actionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
             >
-              <MaterialIcons name="event" size={32} color="#fff" />
+              <MaterialIcons name="edit" size={32} color="#fff" />
               <View style={styles.actionContent}>
-                <ThemedText style={styles.actionTitle}>Create Event</ThemedText>
+                <ThemedText style={styles.actionTitle}>Update Interests</ThemedText>
                 <ThemedText style={styles.actionSubtitle}>
-                  Organize neighborhood gatherings and activities
+                  Refine your matching preferences
                 </ThemedText>
               </View>
               <MaterialIcons name="arrow-forward" size={24} color="#fff" />
@@ -209,27 +297,17 @@ export default function CommunityDashboard() {
 
           <TouchableOpacity 
             style={styles.actionCard}
-            onPress={() => {
-              console.log('🎯 DASHBOARD: Create Group button pressed');
-              try {
-                navigation.navigate('CreateGroup');
-                console.log('✅ DASHBOARD: Navigation to CreateGroup successful');
-              } catch (error) {
-                console.log('❌ DASHBOARD: Navigation error:', error);
-              }
-            }}
+            onPress={() => navigation.navigate('ConnectionsList')}
           >
             <LinearGradient
-              colors={["#4b7bec", "#3742fa"]}
+              colors={['#26de81', '#20bf6b']}
               style={styles.actionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
             >
-              <MaterialIcons name="group-add" size={32} color="#fff" />
+              <FontAwesome5 name="link" size={32} color="#fff" />
               <View style={styles.actionContent}>
-                <ThemedText style={styles.actionTitle}>Start a Group</ThemedText>
+                <ThemedText style={styles.actionTitle}>My Connections</ThemedText>
                 <ThemedText style={styles.actionSubtitle}>
-                  Create communities around shared interests
+                  {connectionsCount} active connection{connectionsCount !== 1 ? 's' : ''}
                 </ThemedText>
               </View>
               <MaterialIcons name="arrow-forward" size={24} color="#fff" />
@@ -238,27 +316,17 @@ export default function CommunityDashboard() {
 
           <TouchableOpacity 
             style={styles.actionCard}
-            onPress={() => {
-              console.log('🎯 DASHBOARD: Create Discussion button pressed');
-              try {
-                navigation.navigate('CreateDiscussion');
-                console.log('✅ DASHBOARD: Navigation to CreateDiscussion successful');
-              } catch (error) {
-                console.log('❌ DASHBOARD: Navigation error:', error);
-              }
-            }}
+            onPress={() => navigation.navigate('ConversationsList')}
           >
             <LinearGradient
-              colors={["#26de81", "#20bf6b"]}
+              colors={['#a55eea', '#8854d0']}
               style={styles.actionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
             >
-              <MaterialIcons name="forum" size={32} color="#fff" />
+              <MaterialIcons name="chat-bubble" size={32} color="#fff" />
               <View style={styles.actionContent}>
-                <ThemedText style={styles.actionTitle}>Start Discussion</ThemedText>
+                <ThemedText style={styles.actionTitle}>Messages</ThemedText>
                 <ThemedText style={styles.actionSubtitle}>
-                  Share thoughts and engage with neighbors
+                  Chat with your connections
                 </ThemedText>
               </View>
               <MaterialIcons name="arrow-forward" size={24} color="#fff" />
@@ -266,67 +334,96 @@ export default function CommunityDashboard() {
           </TouchableOpacity>
         </View>
 
-        {/* Recent Events */}
-        {recentEvents.length > 0 && (
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Upcoming Events</ThemedText>
-            {recentEvents.map((event: any, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.eventCard}
-                onPress={() => navigation.navigate('EventDetails', { eventId: event._id })}
-              >
-                <View style={styles.eventIcon}>
-                  <FontAwesome5 name="calendar" size={20} color="#667eea" />
-                </View>
-                <View style={styles.eventInfo}>
-                  <ThemedText style={styles.eventTitle}>{event.name}</ThemedText>
-                  <ThemedText style={styles.eventDate}>
-                    {new Date(event.dateTime).toLocaleDateString()}
+        {/* Info Box */}
+        <View style={styles.infoBox}>
+          <MaterialIcons name="info" size={24} color="#fff" />
+          <View style={styles.infoContent}>
+            <ThemedText style={styles.infoTitle}>How It Works</ThemedText>
+            <ThemedText style={styles.infoText}>
+              We use an advanced matching algorithm to connect you with neighbors
+              who share similar interests. The more interests you have in common,
+              the higher the match percentage!
                   </ThemedText>
                 </View>
-                <MaterialIcons name="arrow-forward-ios" size={16} color="#ccc" />
-              </TouchableOpacity>
-            ))}
           </View>
-        )}
-
-        {/* My Groups */}
-        {myGroups.length > 0 && (
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>My Groups</ThemedText>
-            {myGroups.map((group: any, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={styles.groupCard}
-                onPress={() => navigation.navigate('GroupDetails', { groupId: group._id })}
-              >
-                <View style={styles.groupIcon}>
-                  <FontAwesome5 name="users" size={20} color="#764ba2" />
-                </View>
-                <View style={styles.groupInfo}>
-                  <ThemedText style={styles.groupTitle}>{group.name}</ThemedText>
-                  <ThemedText style={styles.groupMembers}>
-                    {group.memberIds?.length || 0} members
-                  </ThemedText>
-                </View>
-                <MaterialIcons name="arrow-forward-ios" size={16} color="#ccc" />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
       </ScrollView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  scrollContainer: { paddingBottom: 30 },
+  
+  // Onboarding Styles
+  onboardingHeader: {
+    alignItems: 'center',
+    padding: 40,
+    paddingTop: 80,
   },
-  scrollContainer: {
-    paddingBottom: 20,
+  onboardingTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 30,
+    textAlign: 'center',
   },
+  onboardingSubtitle: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 15,
+    textAlign: 'center',
+    paddingHorizontal: 30,
+  },
+  featuresContainer: {
+    paddingHorizontal: 20,
+    marginTop: 20,
+  },
+  featureCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 20,
+    padding: 25,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  featureTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  featureText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  getStartedButton: {
+    marginHorizontal: 20,
+    marginTop: 30,
+    borderRadius: 25,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  getStartedGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+  },
+  getStartedText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+
+  // Main Dashboard Styles
   header: {
     alignItems: 'center',
     padding: 30,
@@ -344,64 +441,79 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textAlign: 'center',
   },
-  statsContainer: {
+  statsCard: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 20,
+    padding: 25,
+    marginHorizontal: 20,
+    marginBottom: 25,
   },
-  statCard: {
-    width: (width - 60) / 2,
-    marginBottom: 15,
-  },
-  statGradient: {
-    borderRadius: 15,
-    padding: 20,
+  statItem: {
+    flex: 1,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    marginHorizontal: 20,
   },
   statValue: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#fff',
     marginTop: 10,
   },
-  statTitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
+  statLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 5,
+    textAlign: 'center',
   },
-  actionsContainer: {
+  section: {
     paddingHorizontal: 20,
-    marginBottom: 30,
+    marginBottom: 25,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
   },
   sectionTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 15,
+  },
+  interestsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  interestTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  interestTagText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  actionsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 25,
   },
   actionCard: {
     marginBottom: 15,
-    borderRadius: 15,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
   },
   actionGradient: {
     flexDirection: 'row',
@@ -419,71 +531,45 @@ const styles = StyleSheet.create({
   },
   actionSubtitle: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.9)',
     marginTop: 5,
   },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 25,
-  },
-  eventCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    padding: 15,
+  infoBox: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 15,
+    padding: 20,
+    marginHorizontal: 20,
   },
-  eventIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  eventInfo: {
+  infoContent: {
     flex: 1,
     marginLeft: 15,
   },
-  eventTitle: {
+  infoTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 8,
   },
-  eventDate: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 2,
+  infoText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    lineHeight: 20,
   },
-  groupCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    padding: 15,
+  requestsBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    backgroundColor: 'rgba(241, 196, 15, 0.3)',
+    borderRadius: 15,
+    padding: 15,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    gap: 10,
   },
-  groupIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  groupInfo: {
+  requestsBannerText: {
     flex: 1,
-    marginLeft: 15,
-  },
-  groupTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
     color: '#fff',
-  },
-  groupMembers: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 2,
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
