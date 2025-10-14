@@ -238,13 +238,13 @@ export default function HomeScreen() {
 
             <TouchableOpacity
               style={styles.moduleCard}
-              onPress={() => router.replace('/community')}
+              onPress={() => router.push('/community/Dashboard' as any)}
             >
               <View style={styles.moduleIconContainer}>
                 <FontAwesome5 name="users-cog" size={30} color="#4c669f" />
               </View>
               <ThemedText style={styles.moduleTitle}>VibeTribe</ThemedText>
-              <ThemedText style={styles.moduleDescription}>2 events happening soon</ThemedText>
+              <ThemedText style={styles.moduleDescription}>Find like-minded neighbors</ThemedText>
             </TouchableOpacity>
           </ScrollView>
         </View>
