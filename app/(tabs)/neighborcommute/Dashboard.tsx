@@ -5,10 +5,12 @@ import {
   StyleSheet, 
   Text, 
   ScrollView,
-  ActivityIndicator 
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -19,7 +21,8 @@ interface DashboardStats {
   completedRides: number;
 }
 
-export default function NeighborCommuteDashboard({ navigation }: { navigation: any }) {
+export default function NeighborCommuteDashboard() {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats>({
     totalRides: 0,
     offeredRides: 0,
@@ -59,23 +62,93 @@ export default function NeighborCommuteDashboard({ navigation }: { navigation: a
     
     try {
       setLoading(true);
-      const response = await api.get('/rides/my-rides', {
-        params: { userId }
-      });
+      console.log('📊 Fetching dashboard stats for user:', userId);
       
-      const { offered, joined } = response.data;
+      // Use the correct endpoint with userId parameter
+      const response = await api.get(`/rides/my-rides?userId=${userId}`);
+      console.log('API Response:', response.data);
       
-      const completedOffered = offered.filter((ride: any) => ride.status === 'completed').length;
-      const completedJoined = joined.filter((ride: any) => ride.status === 'completed').length;
+      if (response.data && typeof response.data === 'object') {
+        const { offered = [], joined = [] } = response.data;
+        
+        console.log('Offered rides:', offered.length);
+        console.log('Joined rides:', joined.length);
+        
+        // Calculate completed rides
+        const completedOffered = offered.filter((ride: any) => ride.status === 'completed').length;
+        const completedJoined = joined.filter((ride: any) => ride.status === 'completed').length;
+        
+        const newStats = {
+          totalRides: offered.length + joined.length,
+          offeredRides: offered.length,
+          joinedRides: joined.length,
+          completedRides: completedOffered + completedJoined
+        };
+        
+        console.log('Calculated stats:', newStats);
+        setStats(newStats);
+      } else {
+        throw new Error('Invalid response format');
+      }
       
-      setStats({
-        totalRides: offered.length + joined.length,
-        offeredRides: offered.length,
-        joinedRides: joined.length,
-        completedRides: completedOffered + completedJoined
-      });
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      console.error('❌ Error fetching dashboard stats:', error);
+      
+      // Fallback: try to get all rides and filter
+      try {
+        console.log('Trying fallback with all rides...');
+        const fallbackResponse = await api.get('/rides');
+        
+        if (fallbackResponse.data && Array.isArray(fallbackResponse.data)) {
+          const allRides = fallbackResponse.data;
+          
+          const offered = allRides.filter((ride: any) => {
+            const driverId = ride.driverId?._id || ride.driverId;
+            return driverId === userId;
+          });
+          
+          const joined = allRides.filter((ride: any) => {
+            const passengers = ride.passengerIds || [];
+            return passengers.some((passenger: any) => {
+              const passengerId = passenger._id || passenger.userId?._id || passenger.userId || passenger;
+              return passengerId === userId;
+            });
+          });
+          
+          const completedOffered = offered.filter((ride: any) => ride.status === 'completed').length;
+          const completedJoined = joined.filter((ride: any) => ride.status === 'completed').length;
+          
+          setStats({
+            totalRides: offered.length + joined.length,
+            offeredRides: offered.length,
+            joinedRides: joined.length,
+            completedRides: completedOffered + completedJoined
+          });
+          
+          console.log('Fallback stats calculated successfully');
+        } else {
+          throw new Error('Fallback also failed');
+        }
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+        
+        // Set default stats on complete failure
+        setStats({
+          totalRides: 0,
+          offeredRides: 0,
+          joinedRides: 0,
+          completedRides: 0
+        });
+        
+        Alert.alert(
+          'Unable to Load Stats',
+          'We couldn\'t load your ride statistics. Please check your connection and try again.',
+          [
+            { text: 'Retry', onPress: fetchDashboardStats },
+            { text: 'OK', style: 'cancel' }
+          ]
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -158,7 +231,7 @@ export default function NeighborCommuteDashboard({ navigation }: { navigation: a
         <View style={styles.actionsContainer}>
           <TouchableOpacity 
             style={[styles.actionCard, styles.primaryCard]} 
-            onPress={() => navigation.navigate('RideDiscovery')}
+            onPress={() => router.push('/(tabs)/neighborcommute/RideDiscovery')}
           >
             <LinearGradient
               colors={["#4facfe", "#00f2fe"]}
@@ -181,7 +254,7 @@ export default function NeighborCommuteDashboard({ navigation }: { navigation: a
 
           <TouchableOpacity 
             style={[styles.actionCard, styles.secondaryCard]} 
-            onPress={() => navigation.navigate('RideOffer')}
+            onPress={() => router.push('/(tabs)/neighborcommute/RideOffer')}
           >
             <LinearGradient
               colors={["#a8edea", "#fed6e3"]}
@@ -204,7 +277,7 @@ export default function NeighborCommuteDashboard({ navigation }: { navigation: a
 
           <TouchableOpacity 
             style={[styles.actionCard, styles.tertiaryCard]} 
-            onPress={() => navigation.navigate('MyRides')}
+            onPress={() => router.push('/(tabs)/neighborcommute/MyRides')}
           >
             <LinearGradient
               colors={["#ffecd2", "#fcb69f"]}

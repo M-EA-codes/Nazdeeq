@@ -1,38 +1,59 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { useThemeColor } from '@/hooks/useThemeColor';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+
+function TabBarIcon({ name, color }: { name: keyof typeof Ionicons.glyphMap; color: string }) {
+  return <Ionicons name={name} size={24} color={color} />;
+}
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
-  const tintColor = useThemeColor({ light: '#3b5998', dark: '#4c669f' }, 'tint');
-  const tabColor = useThemeColor({ light: '#666', dark: '#ccc' }, 'text');
+  const colorScheme = useColorScheme();
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: tintColor,
-        tabBarInactiveTintColor: tabColor,
+        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarStyle: {
+          backgroundColor: Colors[colorScheme ?? 'light'].background,
+          borderTopWidth: 0,
+          elevation: 8,
+          shadowOpacity: 0.1,
           height: 60,
-          paddingBottom: 5,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
-        tabBarBackground: () => TabBarBackground,
-      }}
-    >
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+        },
+      }}>
       <Tabs.Screen
         name="home"
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <FontAwesome5
-              name="home"
-              size={24}
-              color={focused ? '#3b5998' : '#4c669f'}
-              solid
-            />
+            <TabBarIcon name={focused ? 'home' : 'home-outline'} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="neighborcommute"
+        options={{
+          title: 'Commute',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon name={focused ? 'car' : 'car-outline'} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="neighborworks"
+        options={{
+          title: 'Works',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon name={focused ? 'briefcase' : 'briefcase-outline'} color={color} />
           ),
         }}
       />
@@ -41,56 +62,25 @@ export default function TabLayout() {
         options={{
           title: 'Community',
           tabBarIcon: ({ color, focused }) => (
-            <FontAwesome5
-              name="users"
-              size={24}
-              color={focused ? '#3b5998' : '#4c669f'}
-              solid
-            />
-          ),
-        }}
-        initialParams={{ screen: 'Dashboard' }}
-      />
-      <Tabs.Screen
-        name="neighborWorks"
-        options={{
-          title: 'NeighborWorks',
-          tabBarIcon: ({ color, focused }) => (
-            <FontAwesome5
-              name="house-damage"
-              size={24}
-              color={focused ? '#3b5998' : '#4c669f'}
-              solid
-            />
+            <TabBarIcon name={focused ? 'people' : 'people-outline'} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="neighborcommute"
+        name="vibetribe"
         options={{
-          title: 'NeighborCommute',
+          title: 'VibeTribe',
           tabBarIcon: ({ color, focused }) => (
-            <FontAwesome5
-              name="car-side"
-              size={24}
-              color={focused ? '#3b5998' : '#4c669f'}
-              solid
-            />
+            <TabBarIcon name={focused ? 'musical-notes' : 'musical-notes-outline'} color={color} />
           ),
         }}
-        initialParams={{ screen: 'Dashboard' }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <FontAwesome5
-              name="user"
-              size={24}
-              color={focused ? '#3b5998' : '#4c669f'}
-              solid={false}
-            />
+            <TabBarIcon name={focused ? 'person' : 'person-outline'} color={color} />
           ),
         }}
       />

@@ -1,34 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  StyleSheet, 
   View, 
-  ScrollView, 
   TouchableOpacity, 
-  RefreshControl,
-  Alert,
-  Dimensions,
+  StyleSheet, 
+  Text, 
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ThemedText } from '@/components/ThemedText';
-import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import config from '@/config';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/components/ThemedText';
+import api from '../../api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width } = Dimensions.get('window');
-const api = axios.create({ baseURL: config.API_URL });
+interface CommunityStats {
+  totalDiscussions: number;
+  activePolls: number;
+  userParticipation: number;
+  recentActivity: number;
+}
 
-export default function VibeTribeDashboard() {
-  const navigation = useNavigation();
-  const [userId, setUserId] = useState<string | null>(null);
-  const [setupCompleted, setSetupCompleted] = useState(false);
-  const [userInterests, setUserInterests] = useState<string[]>([]);
-  const [matchCount, setMatchCount] = useState(0);
-  const [connectionsCount, setConnectionsCount] = useState(0);
-  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+interface RecentItem {
+  _id: string;
+  title: string;
+  type: 'discussion' | 'poll';
+  author: string;
+  timeAgo: string;
+  category: string;
+}
+
+export default function CommunityPulseDashboard() {
+  const navigation = useNavigation<any>();
+  const [stats, setStats] = useState<CommunityStats>({
+    totalDiscussions: 0,
+    activePolls: 0,
+    userParticipation: 0,
+    recentActivity: 0
+  });
+  const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUserData();
@@ -55,203 +70,211 @@ export default function VibeTribeDashboard() {
     }
   };
 
-  const fetchDashboardData = async () => {
-    if (!userId) return;
-
+  const getTimeAgo = (dateString: string | undefined) => {
     try {
-      setLoading(true);
-
-      // Get user interests and setup status
-      const userResponse = await api.get(`/vibe-tribe/interests/${userId}`);
-      if (userResponse.data.success) {
-        setSetupCompleted(userResponse.data.user.vibeTribeSetupCompleted);
-        setUserInterests(userResponse.data.user.vibeTribeInterests || []);
-
-        // If setup is completed, fetch match count and connection stats
-        if (userResponse.data.user.vibeTribeSetupCompleted) {
-          try {
-            const matchesResponse = await api.get(`/vibe-tribe/matches/${userId}`, {
-              params: { limit: 100 },
-            });
-            if (matchesResponse.data.success) {
-              setMatchCount(matchesResponse.data.totalMatches);
-            }
-          } catch (error) {
-            console.log('No matches yet or error fetching matches');
-            setMatchCount(0);
-          }
-
-          // Fetch connection stats
-          try {
-            const statsResponse = await api.get(`/connections/stats/${userId}`);
-            if (statsResponse.data.success) {
-              setConnectionsCount(statsResponse.data.stats.totalConnections);
-              setPendingRequestsCount(statsResponse.data.stats.pendingReceived);
-            }
-          } catch (error) {
-            console.log('Error fetching connection stats');
-          }
-        }
+      if (!dateString) return 'Unknown';
+      
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date string:', dateString);
+        return 'Unknown';
       }
+      
+      const now = new Date();
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+      
+      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+      return `${Math.floor(diffInMinutes / 1440)}d ago`;
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error formatting date:', error);
+      return 'Unknown';
     }
   };
 
-  const onRefresh = async () => {
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch discussions with better error handling
+      let discussionsData = [];
+      try {
+        const discussionsResponse = await api.get('/discussions?limit=100');
+        console.log('Discussions response:', discussionsResponse.data);
+        
+        if (Array.isArray(discussionsResponse.data)) {
+          discussionsData = discussionsResponse.data;
+        } else {
+          discussionsData = [];
+        }
+      } catch (error) {
+        console.error('Error fetching discussions:', error);
+        discussionsData = [];
+      }
+
+      // Fetch polls with better error handling
+      let pollsData = [];
+      try {
+        const pollsResponse = await api.get('/polls?limit=100');
+        console.log('Polls response:', pollsResponse.data);
+        
+        if (Array.isArray(pollsResponse.data)) {
+          pollsData = pollsResponse.data;
+        } else {
+          pollsData = [];
+        }
+      } catch (error) {
+        console.error('Error fetching polls:', error);
+        pollsData = [];
+      }
+
+      const activePolls = pollsData.filter((poll: any) => poll.isActive === true).length;
+
+      // Calculate user participation (discussions + poll votes)
+      const userDiscussions = discussionsData.filter((d: any) => {
+        const authorId = d.authorId?._id || d.authorId;
+        return authorId === userId;
+      }).length;
+      
+      const userPolls = pollsData.filter((p: any) => {
+        const createdBy = p.createdBy?._id || p.createdBy;
+        return createdBy === userId;
+      }).length;
+
+      setStats({
+        totalDiscussions: discussionsData.length,
+        activePolls,
+        userParticipation: userDiscussions + userPolls,
+        recentActivity: discussionsData.filter((d: any) => {
+          try {
+            const dateStr = d.createdAt || d.created_at;
+            if (!dateStr) return false;
+            
+            const createdAt = new Date(dateStr);
+            if (isNaN(createdAt.getTime())) return false;
+            
+            const dayAgo = new Date();
+            dayAgo.setDate(dayAgo.getDate() - 1);
+            return createdAt > dayAgo;
+          } catch {
+            return false;
+          }
+        }).length
+      });
+
+      // Combine recent discussions and polls with safe access
+      const recentDiscussions = discussionsData.slice(0, 3).map((d: any) => ({
+        _id: d._id || '',
+        title: d.title || 'Untitled Discussion',
+        type: 'discussion' as const,
+        author: d.authorId?.fullName || d.authorId?.name || 'Anonymous',
+        timeAgo: getTimeAgo(d.createdAt || d.created_at),
+        category: d.category || 'other'
+      }));
+
+      const recentPolls = pollsData.slice(0, 2).map((p: any) => ({
+        _id: p._id || '',
+        title: p.title || 'Untitled Poll',
+        type: 'poll' as const,
+        author: p.createdBy?.fullName || p.createdBy?.name || 'Anonymous',
+        timeAgo: getTimeAgo(p.createdAt || p.created_at),
+        category: p.category || 'other'
+      }));
+
+      setRecentItems([...recentDiscussions, ...recentPolls]);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      // Set default values on error
+      setStats({
+        totalDiscussions: 0,
+        activePolls: 0,
+        userParticipation: 0,
+        recentActivity: 0
+      });
+      setRecentItems([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const navigateToScreen = (screenName: string, params?: any) => {
+    console.log('Navigating to:', screenName, 'with params:', params);
+    
+    try {
+      if (screenName === 'DiscussionDetail' && params?.discussionId) {
+        console.log('Navigating to DiscussionDetail with ID:', params.discussionId);
+        navigation.navigate('DiscussionDetail', { id: params.discussionId });
+      } else if (screenName === 'PollDetail' && params?.pollId) {
+        console.log('Navigating to PollDetail with ID:', params.pollId);
+        navigation.navigate('PollDetail', { id: params.pollId });
+      } else if (screenName === 'DiscussionForum') {
+        navigation.navigate('DiscussionForum');
+      } else if (screenName === 'PollsSection') {
+        navigation.navigate('PollsSection');
+      } else {
+        console.warn('Unknown screen or missing params:', screenName, params);
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  };
+
+  const onRefresh = () => {
     setRefreshing(true);
-    await fetchDashboardData();
-    setRefreshing(false);
+    fetchDashboardData();
   };
 
-  const handleGetStarted = () => {
-    navigation.navigate('InterestSelection');
-  };
-
-  const handleViewMatches = () => {
-    navigation.navigate('MatchedUsers');
-  };
-
-  const handleUpdateInterests = () => {
-    navigation.navigate('InterestSelection');
-  };
-
-  // If not set up, show onboarding
-  if (!loading && !setupCompleted) {
+  if (loading) {
     return (
-      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Onboarding Header */}
-          <View style={styles.onboardingHeader}>
-            <FontAwesome5 name="users" size={80} color="#fff" />
-            <ThemedText style={styles.onboardingTitle}>Welcome to VibeTribe!</ThemedText>
-            <ThemedText style={styles.onboardingSubtitle}>
-              Connect with neighbors who share your interests
-            </ThemedText>
-          </View>
-
-          {/* Features */}
-          <View style={styles.featuresContainer}>
-            <View style={styles.featureCard}>
-              <FontAwesome5 name="heart" size={30} color="#e74c3c" />
-              <ThemedText style={styles.featureTitle}>Match by Interests</ThemedText>
-              <ThemedText style={styles.featureText}>
-                Find neighbors with similar hobbies and passions
-              </ThemedText>
-            </View>
-
-            <View style={styles.featureCard}>
-              <FontAwesome5 name="users" size={30} color="#3498db" />
-              <ThemedText style={styles.featureTitle}>Build Connections</ThemedText>
-              <ThemedText style={styles.featureText}>
-                Connect with like-minded people in your community
-              </ThemedText>
-            </View>
-
-            <View style={styles.featureCard}>
-              <FontAwesome5 name="comments" size={30} color="#2ecc71" />
-              <ThemedText style={styles.featureTitle}>Start Conversations</ThemedText>
-              <ThemedText style={styles.featureText}>
-                Message and engage with your matches (coming soon)
-              </ThemedText>
-            </View>
-          </View>
-
-          {/* Get Started Button */}
-          <TouchableOpacity
-            style={styles.getStartedButton}
-            onPress={handleGetStarted}
-          >
-      <LinearGradient
-              colors={['#2ecc71', '#27ae60']}
-              style={styles.getStartedGradient}
-            >
-              <MaterialIcons name="navigate-next" size={28} color="#fff" />
-              <ThemedText style={styles.getStartedText}>Get Started</ThemedText>
-      </LinearGradient>
-    </TouchableOpacity>
-        </ScrollView>
-      </LinearGradient>
-  );
+      <ThemedView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#4c669f" />
+        <ThemedText style={styles.loadingText}>Loading Community Pulse...</ThemedText>
+      </ThemedView>
+    );
   }
 
-  // Main Dashboard (after setup)
   return (
-    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        showsVerticalScrollIndicator={false}
+    <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Header */}
         <View style={styles.header}>
-          <FontAwesome5 name="users" size={40} color="#fff" />
-          <ThemedText style={styles.headerTitle}>VibeTribe</ThemedText>
-          <ThemedText style={styles.headerSubtitle}>
-            Connect with Like-Minded Neighbors
-          </ThemedText>
+          <ThemedText style={styles.title}>Community Pulse</ThemedText>
+          <ThemedText style={styles.subtitle}>Connect • Discuss • Decide</ThemedText>
         </View>
 
-        {/* Stats Card */}
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <FontAwesome5 name="heart" size={30} color="#e74c3c" />
-            <ThemedText style={styles.statValue}>{userInterests.length}</ThemedText>
-            <ThemedText style={styles.statLabel}>Interests</ThemedText>
+        {/* Stats Cards - Reverted to small boxes layout */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <MaterialIcons name="forum" size={24} color="#4c669f" />
+            <ThemedText style={styles.statNumber}>{stats.totalDiscussions}</ThemedText>
+            <ThemedText style={styles.statLabel}>Discussions</ThemedText>
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <FontAwesome5 name="user-friends" size={30} color="#2ecc71" />
-            <ThemedText style={styles.statValue}>{matchCount}</ThemedText>
-            <ThemedText style={styles.statLabel}>Matches</ThemedText>
+          
+          <View style={styles.statCard}>
+            <MaterialIcons name="poll" size={24} color="#4c669f" />
+            <ThemedText style={styles.statNumber}>{stats.activePolls}</ThemedText>
+            <ThemedText style={styles.statLabel}>Active Polls</ThemedText>
           </View>
-          <View style={styles.statDivider} />
-          <TouchableOpacity 
-            style={styles.statItem}
-            onPress={() => navigation.navigate('ConnectionsList')}
-          >
-            <FontAwesome5 name="link" size={30} color="#3498db" />
-            <ThemedText style={styles.statValue}>{connectionsCount}</ThemedText>
-            <ThemedText style={styles.statLabel}>Connected</ThemedText>
-          </TouchableOpacity>
-        </View>
-
-        {/* Pending Requests Banner */}
-        {pendingRequestsCount > 0 && (
-          <TouchableOpacity
-            style={styles.requestsBanner}
-            onPress={() => navigation.navigate('ConnectionRequests')}
-          >
-            <MaterialIcons name="notifications-active" size={24} color="#fff" />
-            <ThemedText style={styles.requestsBannerText}>
-              You have {pendingRequestsCount} pending connection request{pendingRequestsCount !== 1 ? 's' : ''}
-            </ThemedText>
-            <MaterialIcons name="arrow-forward" size={20} color="#fff" />
-          </TouchableOpacity>
-        )}
-
-        {/* Your Interests */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ThemedText style={styles.sectionTitle}>Your Interests</ThemedText>
-            <TouchableOpacity onPress={handleUpdateInterests}>
-              <MaterialIcons name="edit" size={22} color="#fff" />
-            </TouchableOpacity>
+          
+          <View style={styles.statCard}>
+            <MaterialIcons name="person" size={24} color="#4c669f" />
+            <ThemedText style={styles.statNumber}>{stats.userParticipation}</ThemedText>
+            <ThemedText style={styles.statLabel}>Your Posts</ThemedText>
           </View>
-          <View style={styles.interestsContainer}>
-            {userInterests.map((interest, index) => (
-              <View key={index} style={styles.interestTag}>
-                <ThemedText style={styles.interestTagText}>
-                  {interest.charAt(0).toUpperCase() + interest.slice(1)}
-                </ThemedText>
-              </View>
-            ))}
+          
+          <View style={styles.statCard}>
+            <MaterialIcons name="trending-up" size={24} color="#4c669f" />
+            <ThemedText style={styles.statNumber}>{stats.recentActivity}</ThemedText>
+            <ThemedText style={styles.statLabel}>Recent</ThemedText>
           </View>
         </View>
 
@@ -259,317 +282,157 @@ export default function VibeTribeDashboard() {
         <View style={styles.actionsContainer}>
           <TouchableOpacity
             style={styles.actionCard}
-            onPress={handleViewMatches}
+            onPress={() => navigateToScreen('DiscussionForum')}
           >
             <LinearGradient
-              colors={['#ff6b6b', '#ee5a24']}
+              colors={['#FF6B6B', '#FF8E53']}
               style={styles.actionGradient}
             >
-              <FontAwesome5 name="users" size={32} color="#fff" />
-              <View style={styles.actionContent}>
-                <ThemedText style={styles.actionTitle}>View Matches</ThemedText>
-                <ThemedText style={styles.actionSubtitle}>
-                  {matchCount} potential connections found
-                </ThemedText>
-              </View>
-              <MaterialIcons name="arrow-forward" size={24} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={handleUpdateInterests}
-          >
-            <LinearGradient
-              colors={['#4b7bec', '#3742fa']}
-              style={styles.actionGradient}
-            >
-              <MaterialIcons name="edit" size={32} color="#fff" />
-              <View style={styles.actionContent}>
-                <ThemedText style={styles.actionTitle}>Update Interests</ThemedText>
-                <ThemedText style={styles.actionSubtitle}>
-                  Refine your matching preferences
-                </ThemedText>
-              </View>
-              <MaterialIcons name="arrow-forward" size={24} color="#fff" />
+              <MaterialIcons name="forum" size={30} color="#fff" />
+              <ThemedText style={styles.actionTitle}>Discussion Forum</ThemedText>
+              <ThemedText style={styles.actionSubtitle}>Share ideas & concerns</ThemedText>
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.actionCard}
-            onPress={() => navigation.navigate('ConnectionsList')}
+            onPress={() => navigateToScreen('PollsSection')}
           >
             <LinearGradient
-              colors={['#26de81', '#20bf6b']}
+              colors={['#4ECDC4', '#44A08D']}
               style={styles.actionGradient}
             >
-              <FontAwesome5 name="link" size={32} color="#fff" />
-              <View style={styles.actionContent}>
-                <ThemedText style={styles.actionTitle}>My Connections</ThemedText>
-                <ThemedText style={styles.actionSubtitle}>
-                  {connectionsCount} active connection{connectionsCount !== 1 ? 's' : ''}
-                </ThemedText>
-              </View>
-              <MaterialIcons name="arrow-forward" size={24} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={() => navigation.navigate('ConversationsList')}
-          >
-            <LinearGradient
-              colors={['#a55eea', '#8854d0']}
-              style={styles.actionGradient}
-            >
-              <MaterialIcons name="chat-bubble" size={32} color="#fff" />
-              <View style={styles.actionContent}>
-                <ThemedText style={styles.actionTitle}>Messages</ThemedText>
-                <ThemedText style={styles.actionSubtitle}>
-                  Chat with your connections
-                </ThemedText>
-              </View>
-              <MaterialIcons name="arrow-forward" size={24} color="#fff" />
+              <MaterialIcons name="poll" size={30} color="#fff" />
+              <ThemedText style={styles.actionTitle}>Polls & Surveys</ThemedText>
+              <ThemedText style={styles.actionSubtitle}>Voice your opinion</ThemedText>
             </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <MaterialIcons name="info" size={24} color="#fff" />
-          <View style={styles.infoContent}>
-            <ThemedText style={styles.infoTitle}>How It Works</ThemedText>
-            <ThemedText style={styles.infoText}>
-              We use an advanced matching algorithm to connect you with neighbors
-              who share similar interests. The more interests you have in common,
-              the higher the match percentage!
-                  </ThemedText>
-                </View>
+        {/* Recent Activity */}
+        <View style={styles.recentSection}>
+          <View style={styles.sectionHeader}>
+            <ThemedText style={styles.sectionTitle}>Recent Activity</ThemedText>
+            <TouchableOpacity onPress={() => navigateToScreen('DiscussionForum')}>
+              <ThemedText style={styles.viewAllText}>View All</ThemedText>
+            </TouchableOpacity>
           </View>
+
+          {recentItems.length > 0 ? (
+            recentItems.map((item) => (
+              <TouchableOpacity
+                key={item._id}
+                style={styles.recentItem}
+                onPress={() => {
+                  console.log('Clicking item:', item);
+                  if (item.type === 'discussion') {
+                    navigateToScreen('DiscussionDetail', { discussionId: item._id });
+                  } else {
+                    navigateToScreen('PollDetail', { pollId: item._id });
+                  }
+                }}
+              >
+                <View style={styles.recentItemContent}>
+                  <MaterialIcons 
+                    name={item.type === 'discussion' ? 'forum' : 'poll'} 
+                    size={20} 
+                    color="#4c669f" 
+                  />
+                  <View style={styles.recentItemText}>
+                    <ThemedText style={styles.recentItemTitle}>{item.title}</ThemedText>
+                    <ThemedText style={styles.recentItemMeta}>
+                      by {item.author} • {item.timeAgo}
+                    </ThemedText>
+                  </View>
+                </View>
+                <View style={[styles.categoryTag, { backgroundColor: getCategoryColor(item.category) }]}>
+                  <Text style={styles.categoryText}>{item.category}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="forum" size={48} color="#ccc" />
+              <ThemedText style={styles.emptyStateText}>No recent activity</ThemedText>
+              <ThemedText style={styles.emptyStateSubtext}>Start a discussion or create a poll!</ThemedText>
+            </View>
+          )}
+        </View>
       </ScrollView>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContainer: { paddingBottom: 30 },
-  
-  // Onboarding Styles
-  onboardingHeader: {
-    alignItems: 'center',
-    padding: 40,
-    paddingTop: 80,
-  },
-  onboardingTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 30,
-    textAlign: 'center',
-  },
-  onboardingSubtitle: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 15,
-    textAlign: 'center',
-    paddingHorizontal: 30,
-  },
-  featuresContainer: {
-    paddingHorizontal: 20,
-    marginTop: 20,
-  },
-  featureCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 20,
-    padding: 25,
-    marginBottom: 15,
-    alignItems: 'center',
-  },
-  featureTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  featureText: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  getStartedButton: {
-    marginHorizontal: 20,
-    marginTop: 30,
-    borderRadius: 25,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  getStartedGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-  },
-  getStartedText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
+const getCategoryColor = (category: string) => {
+  const colors: { [key: string]: string } = {
+    infrastructure: '#ff6b6b',
+    safety: '#4ecdc4',
+    environment: '#45b7d1',
+    community: '#96ceb4',
+    government: '#feca57',
+    other: '#a0a0a0'
+  };
+  return colors[category] || colors.other;
+};
 
-  // Main Dashboard Styles
-  header: {
+const styles = StyleSheet.create({
+  gradient: { flex: 1 },
+  container: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 16, fontSize: 16, color: '#4c669f' },
+  header: { paddingTop: 60, paddingHorizontal: 20, alignItems: 'center', marginBottom: 30 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
+  subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
+  
+  // Stats Container - Grid Layout
+  statsContainer: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between',
+    paddingHorizontal: 20, 
+    marginBottom: 30 
+  },
+  statCard: { 
+    backgroundColor: 'rgba(255,255,255,0.9)', 
+    borderRadius: 12, 
+    padding: 16, 
+    width: '48%',
+    marginBottom: 12,
     alignItems: 'center',
-    padding: 30,
-    paddingTop: 60,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
   },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 15,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 5,
-    textAlign: 'center',
-  },
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 20,
-    padding: 25,
-    marginHorizontal: 20,
-    marginBottom: 25,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginHorizontal: 20,
-  },
-  statValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 10,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 5,
-    textAlign: 'center',
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 25,
-  },
-  sectionHeader: {
+  statNumber: { fontSize: 24, fontWeight: 'bold', marginTop: 8, color: '#333' },
+  statLabel: { fontSize: 12, color: '#666', marginTop: 4, textAlign: 'center' },
+  
+  actionsContainer: { paddingHorizontal: 20, marginBottom: 30 },
+  actionCard: { marginBottom: 16, borderRadius: 16, overflow: 'hidden' },
+  actionGradient: { padding: 20, flexDirection: 'row', alignItems: 'center' },
+  actionTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginLeft: 16 },
+  actionSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginLeft: 16, marginTop: 4 },
+  
+  recentSection: { paddingHorizontal: 20, marginBottom: 40 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  viewAllText: { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
+  recentItem: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
+    alignItems: 'center'
   },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  interestsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  interestTag: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  interestTagText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  actionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 25,
-  },
-  actionCard: {
-    marginBottom: 15,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 6,
-  },
-  actionGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-  },
-  actionContent: {
-    flex: 1,
-    marginLeft: 15,
-  },
-  actionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  actionSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 5,
-  },
-  infoBox: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 15,
-    padding: 20,
-    marginHorizontal: 20,
-  },
-  infoContent: {
-    flex: 1,
-    marginLeft: 15,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 20,
-  },
-  requestsBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(241, 196, 15, 0.3)',
-    borderRadius: 15,
-    padding: 15,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    gap: 10,
-  },
-  requestsBannerText: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  recentItemContent: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  recentItemText: { marginLeft: 12, flex: 1 },
+  recentItemTitle: { fontSize: 16, fontWeight: '600', color: '#333' },
+  recentItemMeta: { fontSize: 12, color: '#666', marginTop: 4 },
+  categoryTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  categoryText: { fontSize: 10, color: '#fff', fontWeight: '600' },
+  emptyState: { alignItems: 'center', paddingVertical: 40 },
+  emptyStateText: { fontSize: 16, color: 'rgba(255,255,255,0.8)', marginTop: 16 },
+  emptyStateSubtext: { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 8 }
 });

@@ -1,188 +1,142 @@
 const Poll = require('../models/Poll');
-
-// Create a new poll
-exports.createPoll = async (req, res) => {
-  try {
-    const poll = new Poll(req.body);
-    await poll.save();
-    await poll.populate('createdBy', 'fullName profilePhoto');
-    res.status(201).json(poll);
-  } catch (err) {
-    console.error('Error creating poll:', err);
-    res.status(400).json({ error: err.message });
-  }
-};
+const User = require('../models/User');
+const mongoose = require('mongoose');
 
 // Get all polls
-exports.getPolls = async (req, res) => {
+const getPolls = async (req, res) => {
   try {
     const { 
-      category, 
-      isActive, 
-      sortBy = 'created_at', 
-      order = 'desc',
-      page = 1,
-      limit = 10 
+      category = 'all', 
+      sortBy = 'createdAt', 
+      order = 'desc', 
+      limit = 50,
+      isActive 
     } = req.query;
 
-    let query = {};
+    let filter = {};
     
-    if (category && category !== 'all') {
-      query.category = category;
-    }
-    
-    if (isActive !== undefined) {
-      query.isActive = isActive === 'true';
+    // Apply category filter
+    if (category !== 'all') {
+      filter.category = category;
     }
 
-    let sortOrder = {};
-    sortOrder[sortBy] = order === 'desc' ? -1 : 1;
-    
-    const polls = await Poll.find(query)
-      .populate('createdBy', 'fullName profilePhoto')
-      .sort(sortOrder)
-      .skip((page - 1) * parseInt(limit))
+    // Apply active filter
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true';
+    }
+
+    const polls = await Poll.find(filter)
+      .populate('createdBy', 'fullName profilePhoto rating')
+      .sort({ [sortBy]: order === 'desc' ? -1 : 1 })
       .limit(parseInt(limit));
 
-    const totalPolls = await Poll.countDocuments(query);
-    
-    // For large limits (dashboard calls), return array directly
-    if (parseInt(limit) >= 50) {
-      return res.json(polls);
-    }
-    
-    // For paginated requests, return with metadata
-    res.json({
-      polls,
-      totalPages: Math.ceil(totalPolls / limit),
-      currentPage: parseInt(page),
-      totalPolls
-    });
-  } catch (err) {
-    console.error('Error in getPolls:', err);
-    res.status(500).json({ error: err.message, polls: [] });
+    res.json({polls});
+  } catch (error) {
+    console.error('Error fetching polls:', error);
+    res.status(500).json({ error: 'Failed to fetch polls' });
   }
 };
 
-// Get poll by ID
-exports.getPollById = async (req, res) => {
+// Get single poll
+const getPoll = async (req, res) => {
   try {
-    const poll = await Poll.findById(req.params.id)
-      .populate('createdBy', 'fullName profilePhoto');
+    const { id } = req.params;
+    console.log('Fetching poll with ID:', id);
+    
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.error('Invalid ObjectId:', id);
+      return res.status(400).json({ error: 'Invalid poll ID format' });
+    }
+    
+    const poll = await Poll.findById(id)
+      .populate('createdBy', 'fullName profilePhoto rating');
+
+    if (!poll) {
+      console.error('Poll not found for ID:', id);
+      return res.status(404).json({ error: 'Poll not found' });
+    }
+
+    console.log('Poll found successfully:', poll.title);
+    res.json(poll);
+  } catch (error) {
+    console.error('Error fetching poll:', error);
+    res.status(500).json({ error: 'Failed to fetch poll' });
+  }
+};
+
+// Create poll
+const createPoll = async (req, res) => {
+  try {
+    const pollData = req.body;
+    const poll = new Poll(pollData);
+    await poll.save();
+    
+    const populatedPoll = await Poll.findById(poll._id)
+      .populate('createdBy', 'fullName profilePhoto rating');
+    
+    res.status(201).json(populatedPoll);
+  } catch (error) {
+    console.error('Error creating poll:', error);
+    res.status(500).json({ error: 'Failed to create poll' });
+  }
+};
+
+// Vote on poll
+const votePoll = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, optionId } = req.body;
+
+    const poll = await Poll.findById(id);
     if (!poll) {
       return res.status(404).json({ error: 'Poll not found' });
     }
-    res.json(poll);
-  } catch (err) {
-    console.error('Error fetching poll by ID:', err);
-    res.status(500).json({ error: err.message });
-  }
-};
 
-// Vote on a poll
-exports.votePoll = async (req, res) => {
-  try {
-    const { pollId } = req.params;
-    const { userId, optionId } = req.body;
-    
-    if (!userId || optionId === undefined) {
-      return res.status(400).json({ error: 'Missing required fields: userId, optionId' });
-    }
-    
-    const poll = await Poll.findById(pollId);
-    if (!poll) return res.status(404).json({ error: 'Poll not found' });
-    
     if (!poll.isActive) {
-      return res.status(400).json({ error: 'Poll is no longer active' });
+      return res.status(400).json({ error: 'Poll is not active' });
     }
-    
+
+    // Check if poll has ended
     if (poll.endDate && new Date() > poll.endDate) {
       return res.status(400).json({ error: 'Poll has ended' });
     }
 
-    // Check if user has already voted
-    const hasVoted = poll.options.some(option => 
-      option.votes.includes(userId)
-    );
-    
-    if (hasVoted && !poll.allowMultipleVotes) {
-      return res.status(400).json({ error: 'You have already voted in this poll' });
+    const option = poll.options.find(opt => opt.optionId === optionId);
+    if (!option) {
+      return res.status(400).json({ error: 'Invalid option' });
     }
 
-    // Remove previous vote if exists (for single vote polls)
+    // Check if user already voted
+    const hasVoted = poll.options.some(opt => opt.votes.includes(userId));
+    
+    if (hasVoted && !poll.allowMultipleVotes) {
+      return res.status(400).json({ error: 'You have already voted on this poll' });
+    }
+
+    // Remove existing votes if not allowing multiple votes
     if (!poll.allowMultipleVotes) {
-      poll.options.forEach(option => {
-        option.votes = option.votes.filter(id => id.toString() !== userId);
+      poll.options.forEach(opt => {
+        opt.votes = opt.votes.filter(vote => vote.toString() !== userId);
       });
     }
 
-    // Add new vote
-    const optionToVote = poll.options.find(option => option.optionId === optionId);
-    if (!optionToVote) {
-      return res.status(400).json({ error: 'Invalid option selected' });
+    // Add vote
+    if (!option.votes.includes(userId)) {
+      option.votes.push(userId);
     }
-    
-    optionToVote.votes.push(userId);
-    
-    // Update total votes
-    poll.totalVotes = poll.options.reduce((total, option) => total + option.votes.length, 0);
-    
+
     await poll.save();
-    res.json(poll);
-  } catch (err) {
-    console.error('Error voting on poll:', err);
-    res.status(400).json({ error: err.message });
+    res.json({ message: 'Vote recorded successfully' });
+  } catch (error) {
+    console.error('Error voting on poll:', error);
+    res.status(500).json({ error: 'Failed to vote on poll' });
   }
 };
 
-// Update poll by ID
-exports.updatePoll = async (req, res) => {
-  try {
-    const poll = await Poll.findByIdAndUpdate(
-      req.params.id, 
-      { ...req.body, updated_at: new Date() }, 
-      { new: true }
-    ).populate('createdBy', 'fullName profilePhoto');
-    
-    if (!poll) {
-      return res.status(404).json({ error: 'Poll not found' });
-    }
-    res.json(poll);
-  } catch (err) {
-    console.error('Error updating poll:', err);
-    res.status(400).json({ error: err.message });
-  }
-};
-
-// Delete poll by ID
-exports.deletePoll = async (req, res) => {
-  try {
-    const poll = await Poll.findByIdAndDelete(req.params.id);
-    if (!poll) {
-      return res.status(404).json({ error: 'Poll not found' });
-    }
-    res.json({ message: 'Poll deleted' });
-  } catch (err) {
-    console.error('Error deleting poll:', err);
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// End poll by ID
-exports.endPoll = async (req, res) => {
-  try {
-    const poll = await Poll.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false, endDate: new Date() },
-      { new: true }
-    ).populate('createdBy', 'fullName profilePhoto');
-    
-    if (!poll) {
-      return res.status(404).json({ error: 'Poll not found' });
-    }
-    res.json(poll);
-  } catch (err) {
-    console.error('Error ending poll:', err);
-    res.status(400).json({ error: err.message });
-  }
+module.exports = {
+  getPolls,
+  getPoll,
+  createPoll,
+  votePoll
 };

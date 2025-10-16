@@ -1,81 +1,102 @@
 const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
 
-const RideSchema = new Schema({
-  driverId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'User', 
-    required: true,
-    index: true
+const rideSchema = new mongoose.Schema({
+  driverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
-  passengerIds: [{ 
-    type: Schema.Types.ObjectId, 
-    ref: 'User' 
-  }],
-  origin: { 
-    name: { type: String, required: true },
+  origin: {
+    name: {
+      type: String,
+      required: true
+    },
     coordinates: {
-      latitude: Number,
-      longitude: Number
+      lat: Number,
+      lng: Number
     },
     address: String
   },
-  destination: { 
-    name: { type: String, required: true },
+  destination: {
+    name: {
+      type: String,
+      required: true
+    },
     coordinates: {
-      latitude: Number,
-      longitude: Number
+      lat: Number,
+      lng: Number
     },
     address: String
   },
-  dateTime: { 
-    type: Date, 
-    required: true,
-    index: true,
-    validate: {
-      validator: function(v) {
-        return v > new Date();
-      },
-      message: 'Date must be in the future'
-    }
+  dateTime: {
+    type: Date,
+    required: true
   },
-  seatsAvailable: { 
-    type: Number, 
+  seatsAvailable: {
+    type: Number,
     required: true,
-    min: [0, 'Seats cannot be negative'],
-    max: [8, 'Maximum 8 seats allowed']
+    min: 1
   },
   totalSeats: {
     type: Number,
-    default: function() {
-      return this.seatsAvailable;
+    required: true,
+    min: 1
+  },
+  fare: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  description: {
+    type: String,
+    maxLength: 500
+  },
+  vehicleInfo: {
+    make: String,
+    model: String,
+    color: String,
+    licensePlate: String
+  },
+  preferences: {
+    smokingAllowed: {
+      type: Boolean,
+      default: false
+    },
+    petsAllowed: {
+      type: Boolean,
+      default: false
+    },
+    musicAllowed: {
+      type: Boolean,
+      default: true
     }
   },
-  fare: { 
-    type: Number, 
-    required: true,
-    min: [0, 'Fare cannot be negative'],
-    default: 0
+  status: {
+    type: String,
+    enum: ['open', 'full', 'completed', 'cancelled'],
+    default: 'open'
   },
-  notes: { type: String, maxlength: 500 },
-  status: { 
-    type: String, 
-    enum: ['open', 'in_progress', 'completed', 'cancelled'], 
-    default: 'open',
-    index: true
-  },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  passengerIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  route: {
+    distance: String,
+    duration: String,
+    polyline: String
+  }
+}, {
+  timestamps: true
 });
 
-// Update the updatedAt field before saving
-RideSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
-  next();
+// Add indexes for better query performance
+rideSchema.index({ driverId: 1, createdAt: -1 });
+rideSchema.index({ status: 1, dateTime: 1 });
+rideSchema.index({ 'origin.name': 1, 'destination.name': 1 });
+
+// Add created_at virtual for compatibility
+rideSchema.virtual('created_at').get(function() {
+  return this.createdAt;
 });
 
-// Add compound indexes for better query performance
-RideSchema.index({ status: 1, dateTime: 1 });
-RideSchema.index({ 'origin.name': 1, 'destination.name': 1 });
-
-module.exports = mongoose.model('Ride', RideSchema);
+module.exports = mongoose.model('Ride', rideSchema);

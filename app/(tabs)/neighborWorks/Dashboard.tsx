@@ -66,7 +66,7 @@ export default function NeighborWorksDashboard({ navigation }: { navigation: any
     }
   };
 
-  const StatCard = ({ title, value, icon, color }: { title: string; value: string | number; icon: string; color: string }) => (
+  const StatCard = ({ title, value, icon, color }: { title: string; value: string | number; icon: React.ComponentProps<typeof MaterialIcons>['name']; color: string }) => (
     <View style={[styles.statCard, { borderLeftColor: color }]}>
       <MaterialIcons name={icon} size={24} color={color} style={styles.statIcon} />
       <View style={styles.statContent}>
@@ -166,10 +166,10 @@ export default function NeighborWorksDashboard({ navigation }: { navigation: any
           
           <View style={styles.featuresGrid}>
             {[
-              { name: 'Plumbing', icon: 'plumbing', color: '#3a8fd2' },
-              { name: 'Cleaning', icon: 'cleaning-services', color: '#3ad29f' },
-              { name: 'Gardening', icon: 'grass', color: '#4caf50' },
-              { name: 'Electrical', icon: 'electrical-services', color: '#ffd93d' },
+              { name: 'Plumbing', icon: 'build' as const, color: '#3a8fd2' },
+              { name: 'Cleaning', icon: 'cleaning-services' as const, color: '#3ad29f' },
+              { name: 'Gardening', icon: 'local-florist' as const, color: '#4caf50' },
+              { name: 'Electrical', icon: 'electrical-services' as const, color: '#ffd93d' },
             ].map((feature, index) => (
               <TouchableOpacity 
                 key={index}

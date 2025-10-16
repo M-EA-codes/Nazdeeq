@@ -128,20 +128,6 @@ export default function ProfileScreen() {
     if (status !== 'granted') {
       Alert.alert('Permission required', 'Permission to access gallery is required!');
       return;
-              // Update interests
-              const interestsRes = await fetch(`${config.API_URL}/users/${userId}/interests`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ interests })
-              });
-              if (!interestsRes.ok) {
-                const errText = await interestsRes.text();
-                console.error('Interests update failed:', errText);
-                throw new Error('Failed to update interests');
-              }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
