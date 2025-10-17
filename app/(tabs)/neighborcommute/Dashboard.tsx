@@ -66,10 +66,10 @@ export default function NeighborCommuteDashboard() {
       
       // Use the correct endpoint with userId parameter
       const response = await api.get(`/rides/my-rides?userId=${userId}`);
-      console.log('API Response:', response.data);
+      console.log('API Response:', response);
       
-      if (response.data && typeof response.data === 'object') {
-        const { offered = [], joined = [] } = response.data;
+      if (response && typeof response === 'object') {
+        const { offered = [], joined = [] } = response;
         
         console.log('Offered rides:', offered.length);
         console.log('Joined rides:', joined.length);
@@ -99,8 +99,8 @@ export default function NeighborCommuteDashboard() {
         console.log('Trying fallback with all rides...');
         const fallbackResponse = await api.get('/rides');
         
-        if (fallbackResponse.data && Array.isArray(fallbackResponse.data)) {
-          const allRides = fallbackResponse.data;
+        if (fallbackResponse && Array.isArray(fallbackResponse)) {
+          const allRides = fallbackResponse;
           
           const offered = allRides.filter((ride: any) => {
             const driverId = ride.driverId?._id || ride.driverId;

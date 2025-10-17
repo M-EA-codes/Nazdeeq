@@ -103,13 +103,16 @@ export default function CommunityPulseDashboard() {
       let discussionsData = [];
       try {
         const discussionsResponse = await api.get('/discussions?limit=100');
-        console.log('Discussions response:', discussionsResponse.data);
+        console.log('Discussions response:', discussionsResponse);
         
-        if (Array.isArray(discussionsResponse.data)) {
-          discussionsData = discussionsResponse.data;
+        if (discussionsResponse && discussionsResponse.discussions && Array.isArray(discussionsResponse.discussions)) {
+          discussionsData = discussionsResponse.discussions;
+        } else if (Array.isArray(discussionsResponse)) {
+          discussionsData = discussionsResponse;
         } else {
           discussionsData = [];
         }
+        console.log('Processed discussions data:', discussionsData.length, 'items');
       } catch (error) {
         console.error('Error fetching discussions:', error);
         discussionsData = [];
@@ -119,13 +122,16 @@ export default function CommunityPulseDashboard() {
       let pollsData = [];
       try {
         const pollsResponse = await api.get('/polls?limit=100');
-        console.log('Polls response:', pollsResponse.data);
+        console.log('Polls response:', pollsResponse);
         
-        if (Array.isArray(pollsResponse.data)) {
-          pollsData = pollsResponse.data;
+        if (pollsResponse && pollsResponse.polls && Array.isArray(pollsResponse.polls)) {
+          pollsData = pollsResponse.polls;
+        } else if (Array.isArray(pollsResponse)) {
+          pollsData = pollsResponse;
         } else {
           pollsData = [];
         }
+        console.log('Processed polls data:', pollsData.length, 'items');
       } catch (error) {
         console.error('Error fetching polls:', error);
         pollsData = [];
@@ -135,21 +141,24 @@ export default function CommunityPulseDashboard() {
 
       // Calculate user participation (discussions + poll votes)
       const userDiscussions = discussionsData.filter((d: any) => {
+        if (!d || !userId) return false;
         const authorId = d.authorId?._id || d.authorId;
         return authorId === userId;
       }).length;
       
       const userPolls = pollsData.filter((p: any) => {
+        if (!p || !userId) return false;
         const createdBy = p.createdBy?._id || p.createdBy;
         return createdBy === userId;
       }).length;
 
-      setStats({
+      const statsData = {
         totalDiscussions: discussionsData.length,
         activePolls,
         userParticipation: userDiscussions + userPolls,
         recentActivity: discussionsData.filter((d: any) => {
           try {
+            if (!d) return false;
             const dateStr = d.createdAt || d.created_at;
             if (!dateStr) return false;
             
@@ -159,30 +168,44 @@ export default function CommunityPulseDashboard() {
             const dayAgo = new Date();
             dayAgo.setDate(dayAgo.getDate() - 1);
             return createdAt > dayAgo;
-          } catch {
+          } catch (error) {
+            console.warn('Error processing date for recent activity:', error);
             return false;
           }
         }).length
-      });
+      };
+      
+      console.log('Calculated stats:', statsData);
+      console.log('User ID for participation:', userId);
+      console.log('User discussions count:', userDiscussions);
+      console.log('User polls count:', userPolls);
+      
+      setStats(statsData);
 
       // Combine recent discussions and polls with safe access
-      const recentDiscussions = discussionsData.slice(0, 3).map((d: any) => ({
-        _id: d._id || '',
-        title: d.title || 'Untitled Discussion',
-        type: 'discussion' as const,
-        author: d.authorId?.fullName || d.authorId?.name || 'Anonymous',
-        timeAgo: getTimeAgo(d.createdAt || d.created_at),
-        category: d.category || 'other'
-      }));
+      const recentDiscussions = discussionsData.slice(0, 3).map((d: any) => {
+        if (!d) return null;
+        return {
+          _id: d._id || '',
+          title: d.title || 'Untitled Discussion',
+          type: 'discussion' as const,
+          author: d.authorId?.fullName || d.authorId?.name || 'Anonymous',
+          timeAgo: getTimeAgo(d.createdAt || d.created_at),
+          category: d.category || 'other'
+        };
+      }).filter(Boolean);
 
-      const recentPolls = pollsData.slice(0, 2).map((p: any) => ({
-        _id: p._id || '',
-        title: p.title || 'Untitled Poll',
-        type: 'poll' as const,
-        author: p.createdBy?.fullName || p.createdBy?.name || 'Anonymous',
-        timeAgo: getTimeAgo(p.createdAt || p.created_at),
-        category: p.category || 'other'
-      }));
+      const recentPolls = pollsData.slice(0, 2).map((p: any) => {
+        if (!p) return null;
+        return {
+          _id: p._id || '',
+          title: p.title || 'Untitled Poll',
+          type: 'poll' as const,
+          author: p.createdBy?.fullName || p.createdBy?.name || 'Anonymous',
+          timeAgo: getTimeAgo(p.createdAt || p.created_at),
+          category: p.category || 'other'
+        };
+      }).filter(Boolean);
 
       setRecentItems([...recentDiscussions, ...recentPolls]);
     } catch (error) {
@@ -410,8 +433,8 @@ const styles = StyleSheet.create({
   actionsContainer: { paddingHorizontal: 20, marginBottom: 30 },
   actionCard: { marginBottom: 16, borderRadius: 16, overflow: 'hidden' },
   actionGradient: { padding: 20, flexDirection: 'row', alignItems: 'center' },
-  actionTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginLeft: 16 },
-  actionSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginLeft: 16, marginTop: 4 },
+  actionTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginLeft: 16, flex: 1 },
+  actionSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginLeft: 16, marginTop: 4, flex: 1 },
   
   recentSection: { paddingHorizontal: 20, marginBottom: 40 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },

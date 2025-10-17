@@ -4,7 +4,8 @@ const {
   getPolls,
   getPoll,
   createPoll,
-  votePoll
+  votePoll,
+  endPoll
 } = require('../controllers/pollController');
 
 // Get all polls
@@ -18,6 +19,9 @@ router.post('/', createPoll);
 
 // Vote on poll
 router.post('/:id/vote', votePoll);
+
+// End poll (only by creator)
+router.post('/:id/end', endPoll);
 
 // Add sample data endpoint
 router.post('/create-sample', async (req, res) => {

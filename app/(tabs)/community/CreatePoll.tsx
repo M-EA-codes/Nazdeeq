@@ -150,9 +150,23 @@ export default function CreatePoll({ navigation }: { navigation: any }) {
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
+    console.log('Date picker event:', event);
+    console.log('Selected date:', selectedDate);
+    
+    // Hide the date picker
+    setShowDatePicker(false);
+    
+    // Handle the selected date
     if (selectedDate) {
       setEndDate(selectedDate);
+    }
+    
+    // Handle Android date picker dismissal
+    if (Platform.OS === 'android') {
+      if (event.type === 'dismissed') {
+        console.log('Date picker dismissed');
+        return;
+      }
     }
   };
 
@@ -353,21 +367,11 @@ export default function CreatePoll({ navigation }: { navigation: any }) {
               </TouchableOpacity>
             )}
 
-            {showDatePicker && Platform.OS === 'ios' && (
+            {showDatePicker && (
               <DateTimePicker
                 value={endDate}
                 mode="datetime"
-                display="spinner"
-                onChange={onDateChange}
-                minimumDate={new Date()}
-              />
-            )}
-
-            {showDatePicker && Platform.OS === 'android' && (
-              <DateTimePicker
-                value={endDate}
-                mode="datetime"
-                display="default"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={onDateChange}
                 minimumDate={new Date()}
               />

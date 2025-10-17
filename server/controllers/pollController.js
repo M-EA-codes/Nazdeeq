@@ -134,9 +134,46 @@ const votePoll = async (req, res) => {
   }
 };
 
+// End a poll (only by creator)
+const endPoll = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId } = req.body;
+
+    console.log('Ending poll:', id, 'by user:', userId);
+
+    const poll = await Poll.findById(id);
+    if (!poll) {
+      return res.status(404).json({ error: 'Poll not found' });
+    }
+
+    // Check if user is the creator
+    const creatorId = poll.createdBy._id || poll.createdBy;
+    if (creatorId.toString() !== userId) {
+      return res.status(403).json({ error: 'Only the poll creator can end the poll' });
+    }
+
+    // Update poll to inactive
+    poll.isActive = false;
+    poll.endDate = new Date();
+    await poll.save();
+
+    console.log('Poll ended successfully:', poll._id);
+
+    res.json({ 
+      message: 'Poll ended successfully',
+      poll: poll
+    });
+  } catch (error) {
+    console.error('Error ending poll:', error);
+    res.status(500).json({ error: 'Failed to end poll' });
+  }
+};
+
 module.exports = {
   getPolls,
   getPoll,
   createPoll,
-  votePoll
+  votePoll,
+  endPoll
 };

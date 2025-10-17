@@ -31,11 +31,12 @@ interface Poll {
     fullName: string;
     profilePhoto?: string;
   };
-  createdAt: string;
+  createdAt?: string;
+  created_at?: string;
   options: PollOption[];
   totalVotes: number;
   isActive: boolean;
-  endDate?: string;
+  endDate?: string | null;
 }
 
 export default function PollDetail() {
@@ -53,6 +54,14 @@ export default function PollDetail() {
   useEffect(() => {
     fetchUserData();
   }, []);
+
+  useEffect(() => {
+    console.log('userId or poll changed:', { userId, poll: !!poll });
+    if (userId && poll) {
+      console.log('Checking if user is creator...');
+      isUserCreator();
+    }
+  }, [userId, poll]);
 
   useEffect(() => {
     console.log('PollDetail mounted');
@@ -75,11 +84,17 @@ export default function PollDetail() {
     try {
       const storedUserId = await AsyncStorage.getItem('userId');
       const prefs = await AsyncStorage.getItem('userPreferences');
+      console.log('Fetching user data:', { storedUserId, prefs });
+      
       if (storedUserId) {
+        console.log('Setting userId from storedUserId:', storedUserId);
         setUserId(storedUserId);
       } else if (prefs) {
         const parsed = JSON.parse(prefs);
+        console.log('Setting userId from prefs:', parsed.userId);
         setUserId(parsed.userId);
+      } else {
+        console.log('No userId found in storage');
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -93,6 +108,11 @@ export default function PollDetail() {
       
       const response = await api.get(`/polls/${id}`);
       console.log('Poll response:', response);
+      console.log('Poll createdAt:', response?.createdAt);
+      console.log('Poll created_at:', response?.created_at);
+      console.log('Poll endDate:', response?.endDate);
+      console.log('Poll createdBy:', response?.createdBy);
+      console.log('Poll isActive:', response?.isActive);
       
       if (response) {
         setPoll(response);
@@ -143,11 +163,82 @@ export default function PollDetail() {
     return poll.options.find(option => option.votes.includes(userId));
   };
 
-  const formatDate = (dateString: string) => {
+  const isUserCreator = () => {
+    if (!userId || !poll) {
+      console.log('isUserCreator: Missing userId or poll', { userId, poll: !!poll });
+      return false;
+    }
+    const creatorId = poll.createdBy._id || poll.createdBy;
+    const isCreator = creatorId === userId;
+    console.log('isUserCreator check:', {
+      userId,
+      creatorId,
+      isCreator,
+      pollCreatedBy: poll.createdBy
+    });
+    return isCreator;
+  };
+
+  const endPoll = async () => {
+    if (!userId || !poll || !isUserCreator()) return;
+    
+    Alert.alert(
+      'End Poll',
+      'Are you sure you want to end this poll? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'End Poll', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setVoting(true);
+              await api.post(`/polls/${poll._id}/end`, { userId });
+              
+              // Refresh poll data
+              await fetchPoll(poll._id);
+              
+              Alert.alert('Success', 'Poll ended successfully');
+            } catch (error) {
+              console.error('Error ending poll:', error);
+              Alert.alert('Error', 'Failed to end poll. Please try again.');
+            } finally {
+              setVoting(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const formatDate = (dateString: string | undefined) => {
     try {
+      if (!dateString) return 'Unknown date';
+      
       const date = new Date(dateString);
-      return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString();
-    } catch {
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date string:', dateString);
+        return 'Unknown date';
+      }
+      
+      const now = new Date();
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+      
+      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+      if (diffInMinutes < 10080) return `${Math.floor(diffInMinutes / 1440)}d ago`;
+      
+      // For older dates, show compact formatted date
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
       return 'Unknown date';
     }
   };
@@ -229,20 +320,60 @@ export default function PollDetail() {
                 <MaterialIcons name="person" size={20} color="#666" />
                 <Text style={styles.authorName}>{poll.createdBy.fullName}</Text>
               </View>
-              <Text style={styles.date}>{formatDate(poll.createdAt)}</Text>
+              <Text 
+                style={styles.date}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
+                {formatDate(poll.createdAt || poll.created_at)}
+              </Text>
             </View>
             
             {/* Poll Options */}
             <View style={styles.optionsContainer}>
-              <Text style={styles.optionsTitle}>
-                {hasUserVoted() ? `Results (${poll.totalVotes} total votes)` : 'Vote on this poll'}
-              </Text>
+              <View style={styles.optionsHeader}>
+                <Text style={styles.optionsTitle}>
+                  {hasUserVoted() ? `Results (${poll.totalVotes} total votes)` : 'Vote on this poll'}
+                </Text>
+                {(() => {
+                  const isCreator = isUserCreator();
+                  const isActive = poll.isActive;
+                  console.log('End Poll button conditions:', {
+                    isCreator,
+                    isActive,
+                    shouldShow: isCreator && isActive
+                  });
+                  return isCreator && isActive;
+                })() && (
+                  <TouchableOpacity
+                    style={styles.endPollButton}
+                    onPress={endPoll}
+                    disabled={voting}
+                  >
+                    <MaterialIcons name="stop" size={16} color="#fff" />
+                    <Text style={styles.endPollButtonText}>End Poll</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               {poll.options.map((option) => {
                 const percentage = poll.totalVotes > 0 ? (option.votes.length / poll.totalVotes) * 100 : 0;
                 const userVoted = hasUserVoted();
                 const userVoteOption = getUserVoteOption();
                 const isUserChoice = userVoteOption?.optionId === option.optionId;
-                const isExpired = poll.endDate && new Date(poll.endDate) < new Date();
+                const isExpired = (() => {
+                  if (!poll.endDate) return false;
+                  try {
+                    const endDate = new Date(poll.endDate);
+                    if (isNaN(endDate.getTime())) {
+                      console.warn('Invalid endDate:', poll.endDate);
+                      return false;
+                    }
+                    return endDate < new Date();
+                  } catch (error) {
+                    console.error('Error checking endDate:', error);
+                    return false;
+                  }
+                })();
                 
                 return (
                   <TouchableOpacity
@@ -267,20 +398,20 @@ export default function PollDetail() {
                     </Text>
                     
                     {(userVoted || isExpired) && (
-                      <View style={styles.progressContainer}>
-                        <View style={styles.progressBar}>
-                          <View style={[styles.progressFill, { width: `${percentage}%` }]} />
-                        </View>
-                        <Text style={styles.percentageText}>{percentage.toFixed(1)}%</Text>
+                    <View style={styles.progressContainer}>
+                      <View style={styles.progressBar}>
+                        <View style={[styles.progressFill, { width: `${percentage}%` }]} />
                       </View>
+                      <Text style={styles.percentageText}>{percentage.toFixed(1)}%</Text>
+                    </View>
                     )}
                     
                     <View style={styles.optionFooter}>
-                      <Text style={styles.voteCount}>{option.votes.length} votes</Text>
+                    <Text style={styles.voteCount}>{option.votes.length} votes</Text>
                       {isUserChoice && (
                         <MaterialIcons name="check-circle" size={20} color="#4caf50" />
                       )}
-                    </View>
+                  </View>
                   </TouchableOpacity>
                 );
               })}
@@ -404,26 +535,52 @@ const styles = StyleSheet.create({
   authorDetails: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
   },
   authorName: {
     fontSize: 16,
     color: '#666',
     fontWeight: '600',
     marginLeft: 8,
+    flex: 1,
   },
   date: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#999',
+    textAlign: 'right',
+    flexShrink: 1,
+    maxWidth: '40%',
   },
   
   optionsContainer: {
     marginTop: 8,
   },
+  optionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   optionsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 16,
+    flex: 1,
+  },
+  endPollButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ff4444',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  endPollButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   option: {
     marginBottom: 16,

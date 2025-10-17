@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import FirebaseMessagingService, { Message } from '@/services/FirebaseMessagingService';
+import NetInfo from '@react-native-community/netinfo';
 
 export default function ChatScreen({ route, navigation }: { route: any; navigation: any }) {
   const {
@@ -28,10 +29,18 @@ export default function ChatScreen({ route, navigation }: { route: any; navigati
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
   const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     fetchUserData();
+    
+    // Monitor network status
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected ?? false);
+    });
+    
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -173,6 +182,11 @@ export default function ChatScreen({ route, navigation }: { route: any; navigati
               </View>
             )}
             <ThemedText style={styles.headerTitle}>{otherUserName}</ThemedText>
+            {!isOnline && (
+              <View style={styles.offlineIndicator}>
+                <MaterialIcons name="wifi-off" size={12} color="#fff" />
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -322,6 +336,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  offlineIndicator: {
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 8,
   },
   menuButton: {
     width: 40,

@@ -16,11 +16,28 @@ import axios from 'axios';
 import config from '@/config';
 import { useNavigation } from '@react-navigation/native';
 
+// Define navigation types for VibeTribe stack
+type VibeTribeStackParamList = {
+  Dashboard: undefined;
+  InterestSelection: undefined;
+  MatchedUsers: undefined;
+  UserProfile: { userId: string };
+  ConnectionsList: undefined;
+  ConnectionRequests: undefined;
+  ConversationsList: undefined;
+  ChatScreen: {
+    conversationId: string;
+    otherUserId: string;
+    otherUserName: string;
+    otherUserPhoto?: string;
+  };
+};
+
 const { width } = Dimensions.get('window');
 const api = axios.create({ baseURL: config.API_URL });
 
 export default function VibeTribeDashboard() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [userId, setUserId] = useState<string | null>(null);
   const [setupCompleted, setSetupCompleted] = useState(false);
   const [userInterests, setUserInterests] = useState<string[]>([]);
@@ -63,33 +80,35 @@ export default function VibeTribeDashboard() {
 
       // Get user interests and setup status
       const userResponse = await api.get(`/vibe-tribe/interests/${userId}`);
-      if (userResponse.data.success) {
+      console.log('User response:', userResponse);
+      
+      if (userResponse && userResponse.data && userResponse.data.success) {
         setSetupCompleted(userResponse.data.user.vibeTribeSetupCompleted);
         setUserInterests(userResponse.data.user.vibeTribeInterests || []);
 
         // If setup is completed, fetch match count and connection stats
         if (userResponse.data.user.vibeTribeSetupCompleted) {
           try {
-            const matchesResponse = await api.get(`/vibe-tribe/matches/${userId}`, {
-              params: { limit: 100 },
-            });
-            if (matchesResponse.data.success) {
-              setMatchCount(matchesResponse.data.totalMatches);
+            const matchesResponse = await api.get(`/vibe-tribe/matches/${userId}?limit=100`);
+            console.log('Matches response:', matchesResponse);
+            if (matchesResponse && matchesResponse.data && matchesResponse.data.success) {
+              setMatchCount(matchesResponse.data.totalMatches || 0);
             }
           } catch (error) {
-            console.log('No matches yet or error fetching matches');
+            console.log('No matches yet or error fetching matches:', error);
             setMatchCount(0);
           }
 
           // Fetch connection stats
           try {
             const statsResponse = await api.get(`/connections/stats/${userId}`);
-            if (statsResponse.data.success) {
-              setConnectionsCount(statsResponse.data.stats.totalConnections);
-              setPendingRequestsCount(statsResponse.data.stats.pendingReceived);
+            console.log('Stats response:', statsResponse);
+            if (statsResponse && statsResponse.data && statsResponse.data.success) {
+              setConnectionsCount(statsResponse.data.stats.totalConnections || 0);
+              setPendingRequestsCount(statsResponse.data.stats.pendingReceived || 0);
             }
           } catch (error) {
-            console.log('Error fetching connection stats');
+            console.log('Error fetching connection stats:', error);
           }
         }
       }
