@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -56,7 +57,8 @@ interface MyService {
   rating: number;
 }
 
-export default function ServiceProviderDashboard({ navigation }: { navigation: any }) {
+export default function ServiceProviderDashboard() {
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<ServiceStats>({
@@ -109,12 +111,12 @@ export default function ServiceProviderDashboard({ navigation }: { navigation: a
     try {
       // Fetch stats with proper error handling
       const [servicesRes, bookingsRes] = await Promise.all([
-        api.get(`/services/provider/${userId}`).catch(() => ({ data: [] })),
-        api.get(`/service-requests`, { params: { providerId: userId } }).catch(() => ({ data: [] }))
+        api.get(`/services`, { params: { providerId: userId } }).catch(() => []),
+        api.get(`/service-requests`, { params: { providerId: userId } }).catch(() => [])
       ]);
 
-      const services = servicesRes.data || [];
-      const bookings = bookingsRes.data || [];
+      const services = servicesRes || [];
+      const bookings = bookingsRes || [];
 
       // Calculate stats with null checks
       const activeServices = services.filter((s: MyService) => s?.isActive).length;

@@ -42,15 +42,15 @@ export default function NeighborWorksDashboard({ navigation }: { navigation: any
     try {
       // Fetch dashboard statistics with proper error handling
       const [servicesRes, bookingsRes] = await Promise.all([
-        api.get('/services/stats').catch(() => ({ data: { totalServices: 0, activeServices: 0 } })),
-        api.get('/service-requests/stats').catch(() => ({ data: { totalRequests: 0 } }))
+        api.get('/services/stats').catch(() => ({ totalServices: 0, activeServices: 0 })),
+        api.get('/service-requests/stats').catch(() => ({ totalRequests: 0 }))
       ]);
 
       setStats({
-        totalServices: servicesRes.data?.totalServices || 0,
-        activeServices: servicesRes.data?.activeServices || 0,
+        totalServices: servicesRes?.totalServices || 0,
+        activeServices: servicesRes?.activeServices || 0,
         totalProviders: 15, // Mock data
-        totalBookings: bookingsRes.data?.totalRequests || 0,
+        totalBookings: bookingsRes?.totalRequests || 0,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);

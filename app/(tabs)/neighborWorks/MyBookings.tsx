@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -47,7 +48,8 @@ interface Booking {
   createdAt: string;
 }
 
-export default function MyBookings({ navigation }: { navigation: any }) {
+export default function MyBookings() {
+  const navigation = useNavigation();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
