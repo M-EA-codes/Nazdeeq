@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '@/config';
 import * as ImagePicker from 'expo-image-picker';
+import ProfileImage from '@/components/ProfileImage';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState<any>(null);
@@ -170,11 +171,12 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
-            {profilePhoto ? (
-              <Image source={{ uri: profilePhoto }} style={{ width: 80, height: 80, borderRadius: 40 }} />
-            ) : (
-              <IconSymbol name="person.crop.circle.fill" size={80} color="#4c669f" />
-            )}
+            <ProfileImage
+              source={profilePhoto}
+              userId={user?._id}
+              userName={name}
+              size={80}
+            />
           </View>
           {editable ? (
             <>

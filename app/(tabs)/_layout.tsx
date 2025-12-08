@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import TabBarBackground from '@/components/ui/TabBarBackground';
-import { FontAwesome5 } from '@expo/vector-icons';
+import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   const tintColor = useThemeColor({ light: '#3b5998', dark: '#4c669f' }, 'tint');
@@ -57,7 +57,7 @@ export default function TabLayout() {
           title: 'NeighborWorks',
           tabBarIcon: ({ color, focused }) => (
             <FontAwesome5
-              name="house-damage"
+              name="tools"
               size={24}
               color={focused ? '#3b5998' : '#4c669f'}
               solid
@@ -71,10 +71,24 @@ export default function TabLayout() {
           title: 'NeighborCommute',
           tabBarIcon: ({ color, focused }) => (
             <FontAwesome5
-              name="car-side"
+              name="car"
               size={24}
               color={focused ? '#3b5998' : '#4c669f'}
               solid
+            />
+          ),
+        }}
+        initialParams={{ screen: 'Dashboard' }}
+      />
+      <Tabs.Screen
+        name="vibetribe"
+        options={{
+          title: 'VibeTribe',
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialIcons
+              name="people-alt"
+              size={26}
+              color={focused ? '#3b5998' : '#4c669f'}
             />
           ),
         }}
@@ -86,10 +100,10 @@ export default function TabLayout() {
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <FontAwesome5
-              name="user"
+              name="user-circle"
               size={24}
               color={focused ? '#3b5998' : '#4c669f'}
-              solid={false}
+              solid={focused}
             />
           ),
         }}

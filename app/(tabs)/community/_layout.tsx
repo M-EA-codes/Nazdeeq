@@ -1,17 +1,16 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import Dashboard from './Dashboard';
-import InterestSelection from './InterestSelection';
-import MatchedUsers from './MatchedUsers';
-import UserProfile from './UserProfile';
-import ConnectionsList from './ConnectionsList';
-import ConnectionRequests from './ConnectionRequests';
-import ConversationsList from './ConversationsList';
-import ChatScreen from './ChatScreen';
+import CommunityDashboard from './Dashboard';
+import DiscussionForum from './DiscussionForum';
+import PollsSection from './PollsSection';
+import PollDetail from './PollDetail';
+import CreatePoll from './CreatePoll';
+import CreateDiscussion from './CreateDiscussion';
+import DiscussionDetail from './DiscussionDetail';
 
 const Stack = createNativeStackNavigator();
 
-function StackNavigator() {
+export default function CommunityLayout() {
   return (
     <Stack.Navigator 
       initialRouteName="Dashboard"
@@ -19,59 +18,60 @@ function StackNavigator() {
         headerShown: false,
         animation: 'slide_from_right',
         gestureEnabled: true,
+        animationTypeForReplace: 'push',
       }}
     >
       <Stack.Screen 
         name="Dashboard" 
-        component={Dashboard} 
-        options={{ title: 'VibeTribe' }} 
+        component={CommunityDashboard}
+        options={{
+          title: 'Community',
+        }}
       />
-      
       <Stack.Screen 
-        name="InterestSelection" 
-        component={InterestSelection} 
-        options={{ title: 'Choose Interests' }} 
+        name="DiscussionForum" 
+        component={DiscussionForum}
+        options={{
+          title: 'Discussions',
+        }}
       />
-      
       <Stack.Screen 
-        name="MatchedUsers" 
-        component={MatchedUsers} 
-        options={{ title: 'Your Matches' }} 
+        name="PollsSection" 
+        component={PollsSection}
+        options={{
+          title: 'Polls',
+        }}
       />
-      
       <Stack.Screen 
-        name="UserProfile" 
-        component={UserProfile} 
-        options={{ title: 'User Profile' }} 
+        name="PollDetail" 
+        component={PollDetail}
+        options={{
+          title: 'Poll Detail',
+        }}
       />
-
       <Stack.Screen 
-        name="ConnectionsList" 
-        component={ConnectionsList} 
-        options={{ title: 'My Connections' }} 
+        name="CreatePoll" 
+        component={CreatePoll}
+        options={{
+          title: 'Create Poll',
+          animation: 'slide_from_bottom',
+        }}
       />
-
       <Stack.Screen 
-        name="ConnectionRequests" 
-        component={ConnectionRequests} 
-        options={{ title: 'Connection Requests' }} 
+        name="CreateDiscussion" 
+        component={CreateDiscussion}
+        options={{
+          title: 'Create Discussion',
+          animation: 'slide_from_bottom',
+        }}
       />
-
       <Stack.Screen 
-        name="ConversationsList" 
-        component={ConversationsList} 
-        options={{ title: 'Messages' }} 
+        name="DiscussionDetail" 
+        component={DiscussionDetail}
+        options={{
+          title: 'Discussion',
+        }}
       />
-
-      <Stack.Screen 
-        name="ChatScreen" 
-        component={ChatScreen} 
-        options={{ title: 'Chat' }} 
-      />
-    </Stack.Navigator>
+   </Stack.Navigator>
   );
-}
-
-export default function CommunityLayout() {
-  return <StackNavigator />;
 }

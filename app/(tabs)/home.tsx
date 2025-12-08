@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import config from '../../config'; // <-- Fix import to use your JS config file
 import { FontAwesome5 } from '@expo/vector-icons';
+import ProfileImage from '@/components/ProfileImage';
 
 interface Activity {
   id: number;
@@ -138,14 +139,10 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.userInfoContainer}>
             <View style={styles.profileImageContainer}>
-              {userData?.profilePicture ? (
-                <Image
-                  source={{ uri: userData.profilePicture }}
-                  style={{ width: 60, height: 60, borderRadius: 30 }}
-                />
-              ) : (
-                <IconSymbol name="person.crop.circle.fill" size={60} color="#4c669f" />
-              )}
+              <ProfileImage
+                source={userData?.profilePicture}
+                size={60}
+              />
             </View>
             <View style={styles.userTextInfo}>
               <ThemedText style={styles.greeting}>{greeting}, {userData?.name}!</ThemedText>

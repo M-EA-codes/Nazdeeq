@@ -20,6 +20,7 @@ import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ProfileImage from '@/components/ProfileImage';
 
 const { width } = Dimensions.get('window');
 
@@ -239,7 +240,6 @@ export default function RideDiscovery() {
 
   const renderRide = ({ item }: { item: Ride }) => {
     const seatsTaken = (item.totalSeats || item.seatsAvailable + 1) - item.seatsAvailable;
-    const profileImage = item.driverId.profilePhoto || generateUniqueProfileImages(item.driverId._id);
     
     return (
       <LinearGradient
@@ -250,10 +250,12 @@ export default function RideDiscovery() {
       >
         <View style={styles.rideHeader}>
           <View style={styles.driverInfo}>
-            <Image 
-              source={{ uri: profileImage }} 
+            <ProfileImage
+              source={item.driverId.profilePhoto}
+              userId={item.driverId._id}
+              userName={item.driverId.fullName}
+              size={48}
               style={styles.profilePic}
-              defaultSource={{ uri: getDefaultProfileImage() }}
             />
             <View style={styles.driverDetails}>
               <Text style={styles.driverName}>

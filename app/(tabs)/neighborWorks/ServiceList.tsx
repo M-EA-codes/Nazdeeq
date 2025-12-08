@@ -19,6 +19,7 @@ import { MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ProfileImage from '@/components/ProfileImage';
 
 const { width } = Dimensions.get('window');
 
@@ -65,7 +66,7 @@ interface BookingData {
   estimatedBudget?: number;
 }
 
-export default function ServiceList() {
+export default function ServiceList({ navigation }: { navigation: any }) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -257,9 +258,6 @@ export default function ServiceList() {
   );
 
   const renderService = ({ item }: { item: Service }) => {
-    const profileImage = item.providerId.profilePhoto || 
-                        generateProfileImage(item.providerId._id, item.providerId.fullName);
-    
     return (
       <LinearGradient
         colors={["#fff", "#f8f9ff"]}
@@ -269,8 +267,11 @@ export default function ServiceList() {
       >
         <View style={styles.serviceHeader}>
           <View style={styles.providerInfo}>
-            <Image 
-              source={{ uri: profileImage }}
+            <ProfileImage
+              source={item.providerId.profilePhoto}
+              userId={item.providerId._id}
+              userName={item.providerId.fullName}
+              size={60}
               style={styles.providerAvatar}
             />
             <View style={styles.providerDetails}>
@@ -333,7 +334,10 @@ export default function ServiceList() {
         )}
 
         <View style={styles.serviceActions}>
-          <TouchableOpacity style={styles.contactButton}>
+          <TouchableOpacity 
+            style={styles.contactButton}
+            onPress={() => navigation.navigate('ProviderProfile', { providerId: item.providerId._id })}
+          >
             <MaterialIcons name="phone" size={18} color="#4b32c3" />
             <Text style={styles.contactButtonText}>Contact</Text>
           </TouchableOpacity>
