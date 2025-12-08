@@ -2,6 +2,10 @@ import config from './config';
 
 const API_BASE_URL = config.API_URL;
 
+type ApiRequestOptions = RequestInit & {
+  params?: Record<string, any>;
+};
+
 class ApiClient {
   private baseURL: string;
 
@@ -9,41 +13,68 @@ class ApiClient {
     this.baseURL = baseURL;
   }
 
-  async request(endpoint: string, options: RequestInit = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    
+  private buildQuery(params?: Record<string, any>) {
+    if (!params) return '';
+
+    const searchParams = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      if (Array.isArray(value)) {
+        value.forEach((v) => searchParams.append(key, String(v)));
+      } else {
+        searchParams.append(key, String(value));
+      }
+    });
+
+    const queryString = searchParams.toString();
+    return queryString ? `?${queryString}` : '';
+  }
+
+  async request(endpoint: string, options: ApiRequestOptions = {}) {
+    const { params, ...fetchOptions } = options;
+    const url = `${this.baseURL}${endpoint}${this.buildQuery(params)}`;
+
     const defaultHeaders = {
       'Content-Type': 'application/json',
     };
 
-    const config = {
-      ...options,
+    const config: RequestInit = {
+      ...fetchOptions,
       headers: {
         ...defaultHeaders,
-        ...options.headers,
+        ...fetchOptions.headers,
       },
     };
 
     try {
       const response = await fetch(url, config);
-      
+      const data = await response.json().catch(() => null);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        const message =
+          (data && (data.message || data.error)) ||
+          `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(message);
       }
 
-      return await response.json();
+      // Return an axios-like shape to match existing caller expectations
+      return {
+        data,
+        status: response.status,
+        ok: response.ok,
+      };
     } catch (error) {
       console.error('API Request failed:', error);
       throw error;
     }
   }
 
-  async get(endpoint: string, options: RequestInit = {}) {
+  async get(endpoint: string, options: ApiRequestOptions = {}) {
     return this.request(endpoint, { ...options, method: 'GET' });
   }
 
-  async post(endpoint: string, data?: any, options: RequestInit = {}) {
+  async post(endpoint: string, data?: any, options: ApiRequestOptions = {}) {
     return this.request(endpoint, {
       ...options,
       method: 'POST',
@@ -51,7 +82,7 @@ class ApiClient {
     });
   }
 
-  async put(endpoint: string, data?: any, options: RequestInit = {}) {
+  async put(endpoint: string, data?: any, options: ApiRequestOptions = {}) {
     return this.request(endpoint, {
       ...options,
       method: 'PUT',
@@ -59,7 +90,7 @@ class ApiClient {
     });
   }
 
-  async delete(endpoint: string, options: RequestInit = {}) {
+  async delete(endpoint: string, options: ApiRequestOptions = {}) {
     return this.request(endpoint, { ...options, method: 'DELETE' });
   }
 }

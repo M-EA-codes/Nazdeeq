@@ -15,6 +15,7 @@ const serviceRequestRoutes = require('./routes/serviceRequests');
 const neighborWorksRoutes = require('./routes/neighborWorks');
 const vibeTribeRoutes = require('./routes/vibeTribe');
 const connectionRoutes = require('./routes/connections');
+const communityRoutes = require('./routes/community');
 
 // Middleware
 const app = express();
@@ -195,6 +196,7 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/service-requests', serviceRequestRoutes);
 app.use('/api/vibe-tribe', vibeTribeRoutes);
 app.use('/api/connections', connectionRoutes);
+app.use('/api', communityRoutes);
 // Environment variable validation
 console.log('🔧 SERVER: Checking environment variables...');
 console.log('🔧 SERVER: MONGODB_URI:', process.env.MONGODB_URI ? 'SET' : 'NOT_SET');

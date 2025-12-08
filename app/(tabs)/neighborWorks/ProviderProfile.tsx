@@ -8,11 +8,13 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-  Dimensions
+  Dimensions,
+  Linking
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import api from '../../api';
+import ProfileImage from '@/components/ProfileImage';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +29,28 @@ export default function ProviderProfileScreen({ route, navigation }: { route: an
       fetchProviderData();
     }
   }, [providerId]);
+
+  const handleCall = () => {
+    const phone = provider?.phoneNumber;
+    if (!phone) {
+      Alert.alert('Unavailable', 'Phone number not provided by this provider.');
+      return;
+    }
+    Linking.openURL(`tel:${phone}`).catch(() =>
+      Alert.alert('Error', 'Unable to start a call on this device.')
+    );
+  };
+
+  const handleMessage = () => {
+    const phone = provider?.phoneNumber;
+    if (!phone) {
+      Alert.alert('Unavailable', 'Phone number not provided by this provider.');
+      return;
+    }
+    Linking.openURL(`sms:${phone}`).catch(() =>
+      Alert.alert('Error', 'Unable to start messaging on this device.')
+    );
+  };
 
   const fetchProviderData = async () => {
     try {
@@ -92,10 +116,11 @@ export default function ProviderProfileScreen({ route, navigation }: { route: an
         {/* Provider Info */}
         <View style={styles.providerCard}>
           <View style={styles.providerHeader}>
-            <Image 
-              source={{ 
-                uri: provider.profilePhoto || `https://via.placeholder.com/80x80/4b32c3/ffffff?text=${provider.fullName?.charAt(0) || 'P'}`
-              }}
+            <ProfileImage
+              source={provider.profilePhoto}
+              userId={provider._id}
+              userName={provider.fullName}
+              size={80}
               style={styles.providerAvatar}
             />
             <View style={styles.providerInfo}>
@@ -112,11 +137,11 @@ export default function ProviderProfileScreen({ route, navigation }: { route: an
           </View>
 
           <View style={styles.contactButtons}>
-            <TouchableOpacity style={styles.contactButton}>
+            <TouchableOpacity style={styles.contactButton} onPress={handleCall}>
               <MaterialIcons name="phone" size={18} color="#4b32c3" />
               <Text style={styles.contactButtonText}>Call</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.messageButton}>
+            <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
               <MaterialIcons name="message" size={18} color="#fff" />
               <Text style={styles.messageButtonText}>Message</Text>
             </TouchableOpacity>
