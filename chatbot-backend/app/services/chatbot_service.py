@@ -71,10 +71,14 @@ class ChatbotService:
             
             # Loop to handle up to 5 consecutive tool calls (handling chaining if needed)
             for _ in range(5):
+                if not response.candidates or not response.candidates[0].content.parts:
+                    logger.error("No candidates or parts in response")
+                    break
+                    
                 part = response.candidates[0].content.parts[0]
                 
                 # Check for function call
-                if part.function_call:
+                if hasattr(part, 'function_call') and part.function_call:
                     fname = part.function_call.name
                     fargs = {k: v for k, v in part.function_call.args.items()}
                     
@@ -121,7 +125,7 @@ class ChatbotService:
                         break
                 else:
                     # No function call, this is the final text response
-                    final_text = part.text
+                    final_text = part.text if hasattr(part, 'text') else ""
                     break
         
         except Exception as e:

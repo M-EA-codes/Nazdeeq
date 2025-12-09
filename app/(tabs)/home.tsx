@@ -54,7 +54,7 @@ export default function HomeScreen() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
   const [greeting, setGreeting] = useState('');
-  
+
   useEffect(() => {
     // Set greeting based on time of day
     const hours = new Date().getHours();
@@ -86,7 +86,7 @@ export default function HomeScreen() {
             if (res.ok) {
               realUserData = await res.json();
             }
-          } catch {}
+          } catch { }
         }
 
         // Use real user data if available, otherwise fallback to mock
@@ -121,7 +121,7 @@ export default function HomeScreen() {
 
     loadUserData();
   }, []);
-  
+
   if (loading) {
     return (
       <ThemedView style={[styles.container, styles.centerContent]}>
@@ -130,7 +130,7 @@ export default function HomeScreen() {
       </ThemedView>
     );
   }
-  
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -152,7 +152,7 @@ export default function HomeScreen() {
               <ThemedText style={styles.locationText}>Here's what's happening in {userData?.location}</ThemedText>
             </View>
           </View>
-          
+
           <View style={styles.trustScoreContainer}>
             <ThemedText style={styles.trustScoreLabel}>Trust Score</ThemedText>
             <View style={styles.trustScoreBar}>
@@ -161,7 +161,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.trustScoreValue}>{userData?.trustScore}</ThemedText>
           </View>
         </View>
-        
+
         {/* Quick Action Buttons */}
         <View style={styles.quickActionsContainer}>
           <TouchableOpacity
@@ -171,7 +171,7 @@ export default function HomeScreen() {
             <FontAwesome5 name="car-side" size={24} color="#fff" />
             <ThemedText style={styles.quickActionText}>NeighborCommute</ThemedText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.quickActionButton}
             onPress={() => router.replace('/neighborWorks/Dashboard')}
@@ -179,7 +179,7 @@ export default function HomeScreen() {
             <FontAwesome5 name="house-damage" size={24} color="#fff" />
             <ThemedText style={styles.quickActionText}>Neighborworks</ThemedText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.quickActionButton}
             onPress={() => router.replace('/community')}
@@ -190,7 +190,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.quickActionText}>VibeTribe</ThemedText>
           </TouchableOpacity>
         </View>
-        
+
         {/* Ongoing Activity & Notifications Panel */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
@@ -199,7 +199,7 @@ export default function HomeScreen() {
               <ThemedText style={styles.viewMoreText}>View More</ThemedText>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.card}>
             {userData?.recentActivities?.map((activity) => (
               <View key={activity.id} style={styles.notificationItem}>
@@ -209,7 +209,7 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
-        
+
         {/* Modules Quick Access */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Modules Quick Access</ThemedText>
@@ -248,11 +248,11 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </ScrollView>
         </View>
-        
+
         {/* AI-Powered Suggestions */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Suggested For You</ThemedText>
-          
+
           <View style={styles.card}>
             {userData?.suggestions?.map((suggestion) => (
               <TouchableOpacity key={suggestion.id} style={styles.suggestionItem}>

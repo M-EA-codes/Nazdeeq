@@ -1,0 +1,206 @@
+[
+  {
+    "providerId": "684dd7aa8a91249f11a20d16",
+    "title": "Professional Lawn Mowing Service",
+    "description": "I offer complete lawn care services including mowing, edging, and grass trimming. Professional equipment and years of experience.",
+    "category": "gardening",
+    "fixedPrice": 800,
+    "availability": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+    "timeSlots": ["8:00 AM - 12:00 PM", "2:00 PM - 6:00 PM"],
+    "location": "Blue Area, Islamabad",
+    "images": [],
+    "rating": 4.5,
+    "reviewCount": 12,
+    "isActive": true,
+    "tags": ["lawn", "mowing", "gardening", "outdoor"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d17",
+    "title": "Home Electrical Repairs",
+    "description": "Licensed electrician providing safe and reliable electrical repairs, installations, and maintenance for residential properties.",
+    "category": "electrical",
+    "priceRange": {
+      "min": 500,
+      "max": 3000
+    },
+    "availability": ["monday", "wednesday", "friday", "saturday"],
+    "timeSlots": ["9:00 AM - 5:00 PM"],
+    "location": "F-8 Markaz, Islamabad",
+    "images": [],
+    "rating": 4.8,
+    "reviewCount": 25,
+    "isActive": true,
+    "tags": ["electrical", "repairs", "installation", "licensed"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d18",
+    "title": "Deep House Cleaning",
+    "description": "Professional deep cleaning service for homes and apartments. We use eco-friendly products and provide all cleaning supplies.",
+    "category": "cleaning",
+    "fixedPrice": 1200,
+    "availability": ["tuesday", "thursday", "saturday", "sunday"],
+    "timeSlots": ["8:00 AM - 2:00 PM", "3:00 PM - 7:00 PM"],
+    "location": "Centaurus Mall Area, Islamabad",
+    "images": [],
+    "rating": 4.7,
+    "reviewCount": 18,
+    "isActive": true,
+    "tags": ["cleaning", "deep-clean", "eco-friendly", "professional"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d19",
+    "title": "Plumbing Services & Repairs",
+    "description": "Expert plumber available for all types of plumbing issues including leaks, blockages, installations, and emergency repairs.",
+    "category": "plumbing",
+    "priceRange": {
+      "min": 300,
+      "max": 2500
+    },
+    "availability": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
+    "timeSlots": ["7:00 AM - 7:00 PM"],
+    "location": "Saddar, Rawalpindi",
+    "images": [],
+    "rating": 4.6,
+    "reviewCount": 31,
+    "isActive": true,
+    "tags": ["plumbing", "repairs", "emergency", "licensed"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d20",
+    "title": "Custom Carpentry Work",
+    "description": "Skilled carpenter offering custom furniture, cabinet installation, door repairs, and general woodworking services.",
+    "category": "carpentry",
+    "priceRange": {
+      "min": 1000,
+      "max": 15000
+    },
+    "availability": ["monday", "wednesday", "friday"],
+    "timeSlots": ["9:00 AM - 5:00 PM"],
+    "location": "Committee Chowk, Rawalpindi",
+    "images": [],
+    "rating": 4.9,
+    "reviewCount": 8,
+    "isActive": true,
+    "tags": ["carpentry", "furniture", "custom", "woodwork"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d21",
+    "title": "Interior & Exterior Painting",
+    "description": "Professional painting services for homes and offices. Quality paints, clean work, and attention to detail guaranteed.",
+    "category": "painting",
+    "priceRange": {
+      "min": 800,
+      "max": 5000
+    },
+    "availability": ["tuesday", "thursday", "saturday", "sunday"],
+    "timeSlots": ["8:00 AM - 4:00 PM"],
+    "location": "Saidpur Village, Islamabad",
+    "images": [],
+    "rating": 4.4,
+    "reviewCount": 15,
+    "isActive": true,
+    "tags": ["painting", "interior", "exterior", "professional"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d22",
+    "title": "Math & Science Tutoring",
+    "description": "Experienced tutor offering personalized lessons in mathematics and science for students from grade 6 to 12.",
+    "category": "tutoring",
+    "fixedPrice": 1500,
+    "availability": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+    "timeSlots": ["4:00 PM - 8:00 PM"],
+    "location": "Quaid-e-Azam University Area",
+    "images": [],
+    "rating": 4.8,
+    "reviewCount": 22,
+    "isActive": true,
+    "tags": ["tutoring", "math", "science", "education"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d23",
+    "title": "Fast Delivery Service",
+    "description": "Reliable delivery service for documents, packages, and small items within Islamabad and Rawalpindi. Same-day delivery available.",
+    "category": "delivery",
+    "priceRange": {
+      "min": 100,
+      "max": 500
+    },
+    "availability": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
+    "timeSlots": ["9:00 AM - 9:00 PM"],
+    "location": "Blue Area, Islamabad",
+    "images": [],
+    "rating": 4.3,
+    "reviewCount": 45,
+    "isActive": true,
+    "tags": ["delivery", "fast", "reliable", "same-day"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d24",
+    "title": "Garden Design & Landscaping",
+    "description": "Complete garden makeover services including design, planting, irrigation setup, and ongoing maintenance.",
+    "category": "gardening",
+    "priceRange": {
+      "min": 2000,
+      "max": 25000
+    },
+    "availability": ["wednesday", "thursday", "friday", "saturday"],
+    "timeSlots": ["7:00 AM - 3:00 PM"],
+    "location": "F-8 Markaz, Islamabad",
+    "images": [],
+    "rating": 4.7,
+    "reviewCount": 9,
+    "isActive": true,
+    "tags": ["landscaping", "design", "irrigation", "maintenance"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d25",
+    "title": "AC Installation & Repair",
+    "description": "Certified technician for air conditioning installation, repair, maintenance, and gas refilling services.",
+    "category": "electrical",
+    "priceRange": {
+      "min": 800,
+      "max": 4000
+    },
+    "availability": ["monday", "tuesday", "thursday", "friday", "saturday"],
+    "timeSlots": ["8:00 AM - 6:00 PM"],
+    "location": "Centaurus Mall Area, Islamabad",
+    "images": [],
+    "rating": 4.6,
+    "reviewCount": 28,
+    "isActive": true,
+    "tags": ["ac", "installation", "repair", "maintenance"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d26",
+    "title": "Office Cleaning Service",
+    "description": "Professional office cleaning including desks, floors, windows, and sanitization. Weekly and monthly packages available.",
+    "category": "cleaning",
+    "priceRange": {
+      "min": 1500,
+      "max": 8000
+    },
+    "availability": ["monday", "wednesday", "friday", "sunday"],
+    "timeSlots": ["6:00 AM - 10:00 AM", "6:00 PM - 10:00 PM"],
+    "location": "Blue Area, Islamabad",
+    "images": [],
+    "rating": 4.5,
+    "reviewCount": 13,
+    "isActive": true,
+    "tags": ["office", "cleaning", "sanitization", "commercial"]
+  },
+  {
+    "providerId": "684dd7aa8a91249f11a20d27",
+    "title": "English Language Tutoring",
+    "description": "Native English speaker offering conversation practice, grammar lessons, and IELTS preparation for all ages.",
+    "category": "tutoring",
+    "fixedPrice": 2000,
+    "availability": ["tuesday", "thursday", "saturday"],
+    "timeSlots": ["10:00 AM - 2:00 PM", "5:00 PM - 8:00 PM"],
+    "location": "Islamabad Airport Area",
+    "images": [],
+    "rating": 4.9,
+    "reviewCount": 16,
+    "isActive": true,
+    "tags": ["english", "language", "ielts", "conversation"]
+  }
+]
