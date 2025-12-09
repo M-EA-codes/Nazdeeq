@@ -1,103 +1,140 @@
-from app.services.intent_classifier import IntentClassifier
-from app.services.param_extractor import ParamExtractor
-from app.services.query_generator import QueryGenerator
-from app.services.data_retriever import DataRetriever
-from app.services.response_formatter import ResponseFormatter
 from app.services.chat_history import ChatHistoryService
 from app.models.schemas import ChatResponse
+from app.services.tools import tools_map, find_events, find_rides, find_services
+from app.core.config import settings
+import google.generativeai as genai
+from google.protobuf.struct_pb2 import Struct
 import logging
+import json
+
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class ChatbotService:
     def __init__(self):
-        self.intent_classifier = IntentClassifier()
-        self.param_extractor = ParamExtractor()
-        self.query_generator = QueryGenerator()
-        self.data_retriever = DataRetriever()
-        self.response_formatter = ResponseFormatter()
+        genai.configure(api_key=settings.GEMINI_API_KEY)
         self.chat_history = ChatHistoryService()
-    
-    def _filter_data(self, intent: str, data: list) -> list:
-        """Filter data to return only relevant fields"""
-        filtered = []
         
-        for item in data:
-            if intent == "services":
-                filtered.append({
-                    "title": item.get("title"),
-                    "description": item.get("description"),
-                    "location": item.get("location")
-                })
-            elif intent == "events":
-                filtered.append({
-                    "name": item.get("name"),
-                    "description": item.get("description")
-                })
-            elif intent == "rides":
-                filtered.append({
-                    "origin": item.get("origin"),
-                    "destination": item.get("destination"),
-                    "seatsAvailable": item.get("seatsAvailable")
-                })
+        # Tools configuration
+        # Note: We pass the actual functions to the model
+        self.tools = [find_events, find_rides, find_services]
         
-        return filtered
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        system_instruction = f"""You are Nazdeeq's AI assistant. 
+        Current Date: {current_date}.
+        
+        Rules:
+        1. When calling search tools (find_events, find_rides), ALWAYS convert relative dates (today, tomorrow, next week, October) to numeric ISO format (YYYY-MM-DD or YYYY-MM).
+        2. Never pass natural language for dates (e.g. do NOT pass 'October', pass '2025-10').
+        3. Be friendly and concise.
+        """
+        
+        # Initialize model with tools
+        self.model = genai.GenerativeModel(
+            'gemini-2.5-flash-lite',
+            tools=self.tools,
+            system_instruction=system_instruction
+        )
     
     async def process_message(self, message: str, user_id: str = None) -> ChatResponse:
-        """Main orchestration method"""
+        """Main orchestration method using Gemini Function Calling"""
         
         logger.info(f"Processing message: {message} for user: {user_id}")
         
-        # Get history first
+        # 1. Prepare History
         history = []
         if user_id:
-            history = await self.chat_history.get_history(user_id)
+            raw_history = await self.chat_history.get_history(user_id)
+            for msg in raw_history:
+                # Map 'user' -> 'user', 'model' -> 'model'
+                # Ensure parts structure
+                history.append({
+                    "role": msg["role"],
+                    "parts": [{"text": msg["content"]}]
+                })
         
-        # Step 1: Classify intent and extract raw parameters
-        classification = await self.intent_classifier.classify(message, history)
-        intent = classification["intent"]
-        raw_params = classification["params"]
-        logger.info(f"Intent: {intent}, Raw params: {raw_params}")
+        # Ensure history starts with user (Gemini requirement)
+        if history and history[0]["role"] != "user":
+            history.pop(0)
         
-        # Save user message to history
+        # 2. Start Chat Session
+        chat = self.model.start_chat(history=history)
+        
+        # 3. Send Message and Handle Tool Loop
+        collected_data = []
+        detected_intent = "general"
+        final_text = ""
+        
+        try:
+            response = await chat.send_message_async(message)
+            
+            # Loop to handle up to 5 consecutive tool calls (handling chaining if needed)
+            for _ in range(5):
+                part = response.candidates[0].content.parts[0]
+                
+                # Check for function call
+                if part.function_call:
+                    fname = part.function_call.name
+                    fargs = {k: v for k, v in part.function_call.args.items()}
+                    
+                    logger.info(f"Gemini invoked tool: {fname} with args: {fargs}")
+                    
+                    # Update intent tracker
+                    if "events" in fname: detected_intent = "events"
+                    elif "rides" in fname: detected_intent = "rides"
+                    elif "services" in fname: detected_intent = "services"
+                    
+                    # Execute tool
+                    tool_func = tools_map.get(fname)
+                    if tool_func:
+                        try:
+                            tool_result = await tool_func(**fargs)
+                            
+                            # Collect data for frontend
+                            if isinstance(tool_result, list):
+                                collected_data.extend(tool_result)
+                            
+                            # Provide result back to model
+                            # FunctionResponse structure
+                            function_response = {
+                                "function_response": {
+                                    "name": fname,
+                                    "response": {"result": tool_result} 
+                                }
+                            }
+                            
+                            response = await chat.send_message_async(function_response)
+                            
+                        except Exception as tool_err:
+                            logger.error(f"Tool execution failed: {tool_err}")
+                            # Send error back to model
+                            err_resp = {
+                                "function_response": {
+                                    "name": fname,
+                                    "response": {"error": str(tool_err)}
+                                }
+                            }
+                            response = await chat.send_message_async(err_resp)
+                    else:
+                        logger.error(f"Unknown tool called: {fname}")
+                        break
+                else:
+                    # No function call, this is the final text response
+                    final_text = part.text
+                    break
+        
+        except Exception as e:
+            logger.error(f"Error in Gemini interaction: {e}")
+            final_text = "I'm sorry, I'm having trouble connecting right now. Please try again."
+            
+        # 4. Save to History
         if user_id:
             await self.chat_history.add_message(user_id, "user", message)
-
-        data = []
-        # Handle general queries without database search or specific searches
-        if intent != "general":
-             # Step 2: Process and normalize parameters
-            params = self.param_extractor.extract(raw_params)
-            logger.info(f"Normalized params: {params}")
+            await self.chat_history.add_message(user_id, "model", final_text)
             
-            # Step 3: Generate MongoDB query
-            query = self.query_generator.generate(intent, params)
-            logger.info(f"MongoDB query: {query}")
-            
-            # Step 4: Retrieve data from appropriate collection
-            collection_map = {
-                "events": "events",
-                "rides": "rides",
-                "services": "services"
-            }
-            collection = collection_map.get(intent, "events")
-            logger.info(f"Querying collection: {collection}")
-            data = await self.data_retriever.fetch(collection, query)
-            logger.info(f"Found {len(data)} results")
-        
-        # Step 5: Format response with LLM (now with history content)
-        # Note: We pass the *current* extracted data.
-        response_text = await self.response_formatter.format(message, intent, data, history)
-        
-        # Save bot response to history
-        if user_id:
-            await self.chat_history.add_message(user_id, "model", response_text)
-
-        # Step 6: Filter data to return only relevant fields
-        filtered_data = self._filter_data(intent, data)
-        
         return ChatResponse(
-            response=response_text,
-            data=filtered_data,
-            intent=intent
+            response=final_text,
+            data=collected_data,
+            intent=detected_intent
         )

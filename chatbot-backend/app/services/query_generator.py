@@ -8,19 +8,27 @@ class QueryGenerator:
         and_conditions = []
         
         # 1. Handle Date (Direct match)
+        # 1. Handle Date
         if params.get("date"):
-            query["date"] = params["date"]
+            if intent == "events":
+                # Match partial date string in ISO dateTime (e.g. "2025-02-20" matches "2025-02-20T10...")
+                query["dateTime"] = {"$regex": params["date"], "$options": "i"}
+            else:
+                query["date"] = params["date"]
         
         # 2. Handle Location
         if params.get("location"):
             if intent == "rides":
-                # Specific logic for rides: check origin OR destination address
+                # Specific logic for rides
                 and_conditions.append({
                     "$or": [
                         {"origin.address": {"$regex": params["location"], "$options": "i"}},
                         {"destination.address": {"$regex": params["location"], "$options": "i"}}
                     ]
                 })
+            elif intent == "events":
+                 # Events store location as an object with an address field
+                 query["location.address"] = {"$regex": params["location"], "$options": "i"}
             else:
                 # Default behavior
                 query["location"] = {"$regex": params["location"], "$options": "i"}
