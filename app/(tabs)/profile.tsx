@@ -7,7 +7,6 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import config from '@/config';
 import * as ImagePicker from 'expo-image-picker';
-import ProfileImage from '@/components/ProfileImage';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState<any>(null);
@@ -129,20 +128,6 @@ export default function ProfileScreen() {
     if (status !== 'granted') {
       Alert.alert('Permission required', 'Permission to access gallery is required!');
       return;
-              // Update interests
-              const interestsRes = await fetch(`${config.API_URL}/users/${userId}/interests`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ interests })
-              });
-              if (!interestsRes.ok) {
-                const errText = await interestsRes.text();
-                console.error('Interests update failed:', errText);
-                throw new Error('Failed to update interests');
-              }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -171,12 +156,11 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
-            <ProfileImage
-              source={profilePhoto}
-              userId={user?._id}
-              userName={name}
-              size={80}
-            />
+            {profilePhoto ? (
+              <Image source={{ uri: profilePhoto }} style={{ width: 80, height: 80, borderRadius: 40 }} />
+            ) : (
+              <IconSymbol name="person.crop.circle.fill" size={80} color="#4c669f" />
+            )}
           </View>
           {editable ? (
             <>

@@ -2,10 +2,6 @@ import config from './config';
 
 const API_BASE_URL = config.API_URL;
 
-type ApiRequestOptions = RequestInit & {
-  params?: Record<string, any>;
-};
-
 class ApiClient {
   private baseURL: string;
 
@@ -13,68 +9,67 @@ class ApiClient {
     this.baseURL = baseURL;
   }
 
-  private buildQuery(params?: Record<string, any>) {
-    if (!params) return '';
-
-    const searchParams = new URLSearchParams();
-
-    Object.entries(params).forEach(([key, value]) => {
-      if (value === undefined || value === null) return;
-      if (Array.isArray(value)) {
-        value.forEach((v) => searchParams.append(key, String(v)));
-      } else {
-        searchParams.append(key, String(value));
-      }
-    });
-
-    const queryString = searchParams.toString();
-    return queryString ? `?${queryString}` : '';
-  }
-
-  async request(endpoint: string, options: ApiRequestOptions = {}) {
-    const { params, ...fetchOptions } = options;
-    const url = `${this.baseURL}${endpoint}${this.buildQuery(params)}`;
-
+  async request(endpoint: string, options: RequestInit = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    
+    console.log('🌐 API Request:', options.method || 'GET', url);
+    
     const defaultHeaders = {
       'Content-Type': 'application/json',
     };
 
-    const config: RequestInit = {
-      ...fetchOptions,
+    const config = {
+      ...options,
       headers: {
         ...defaultHeaders,
-        ...fetchOptions.headers,
+        ...options.headers,
       },
     };
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json().catch(() => null);
-
+      
+      console.log('🌐 API Response Status:', response.status, response.statusText);
+      
       if (!response.ok) {
-        const message =
-          (data && (data.message || data.error)) ||
-          `HTTP ${response.status}: ${response.statusText}`;
-        throw new Error(message);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('🌐 API Error Response:', errorData);
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Return an axios-like shape to match existing caller expectations
-      return {
-        data,
-        status: response.status,
-        ok: response.ok,
-      };
+      const data = await response.json();
+      console.log('🌐 API Success Response:', data);
+      return data;
     } catch (error) {
-      console.error('API Request failed:', error);
+      console.error('🌐 API Request failed:', error);
       throw error;
     }
   }
 
-  async get(endpoint: string, options: ApiRequestOptions = {}) {
-    return this.request(endpoint, { ...options, method: 'GET' });
+  async get(endpoint: string, options: RequestInit & { params?: any } = {}) {
+    let url = endpoint;
+    
+    // Handle query parameters
+    if (options.params) {
+      const searchParams = new URLSearchParams();
+      Object.keys(options.params).forEach(key => {
+        if (options.params[key] !== undefined && options.params[key] !== null) {
+          searchParams.append(key, options.params[key].toString());
+        }
+      });
+      const queryString = searchParams.toString();
+      if (queryString) {
+        url += (endpoint.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+    
+    // Remove params from options to avoid conflicts
+    const { params, ...restOptions } = options;
+    
+    return this.request(url, { ...restOptions, method: 'GET' });
   }
 
-  async post(endpoint: string, data?: any, options: ApiRequestOptions = {}) {
+  async post(endpoint: string, data?: any, options: RequestInit = {}) {
     return this.request(endpoint, {
       ...options,
       method: 'POST',
@@ -82,7 +77,7 @@ class ApiClient {
     });
   }
 
-  async put(endpoint: string, data?: any, options: ApiRequestOptions = {}) {
+  async put(endpoint: string, data?: any, options: RequestInit = {}) {
     return this.request(endpoint, {
       ...options,
       method: 'PUT',
@@ -90,7 +85,7 @@ class ApiClient {
     });
   }
 
-  async delete(endpoint: string, options: ApiRequestOptions = {}) {
+  async delete(endpoint: string, options: RequestInit = {}) {
     return this.request(endpoint, { ...options, method: 'DELETE' });
   }
 }

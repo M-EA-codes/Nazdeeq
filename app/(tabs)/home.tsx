@@ -118,7 +118,7 @@ export default function HomeScreen() {
       </ThemedView>
     );
   }
-  
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -126,17 +126,21 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View style={styles.userInfoContainer}>
             <View style={styles.profileImageContainer}>
-              <ProfileImage
-                source={userData?.profilePicture}
-                size={60}
-              />
+              {userData?.profilePicture ? (
+                <Image
+                  source={{ uri: userData.profilePicture }}
+                  style={{ width: 60, height: 60, borderRadius: 30 }}
+                />
+              ) : (
+                <IconSymbol name="person.crop.circle.fill" size={60} color="#4c669f" />
+              )}
             </View>
             <View style={styles.userTextInfo}>
               <ThemedText style={styles.greeting}>{greeting}, {userData?.name}!</ThemedText>
               <ThemedText style={styles.locationText}>Here's what's happening in {userData?.location}</ThemedText>
             </View>
           </View>
-          
+
           <View style={styles.trustScoreContainer}>
             <ThemedText style={styles.trustScoreLabel}>Trust Score</ThemedText>
             <View style={styles.trustScoreBar}>
@@ -145,7 +149,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.trustScoreValue}>{userData?.trustScore}</ThemedText>
           </View>
         </View>
-        
+
         {/* Quick Action Buttons */}
         <View style={styles.quickActionsContainer}>
           <TouchableOpacity
@@ -155,7 +159,7 @@ export default function HomeScreen() {
             <FontAwesome5 name="car-side" size={24} color="#fff" />
             <ThemedText style={styles.quickActionText}>NeighborCommute</ThemedText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.quickActionButton}
             onPress={() => router.replace('/neighborWorks/Dashboard')}
@@ -163,7 +167,7 @@ export default function HomeScreen() {
             <FontAwesome5 name="house-damage" size={24} color="#fff" />
             <ThemedText style={styles.quickActionText}>Neighborworks</ThemedText>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={styles.quickActionButton}
             onPress={() => router.replace('/community/Dashboard' as any)}
@@ -174,7 +178,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.quickActionText}>VibeTribe</ThemedText>
           </TouchableOpacity>
         </View>
-        
+
         {/* Ongoing Activity & Notifications Panel */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
@@ -183,7 +187,7 @@ export default function HomeScreen() {
               <ThemedText style={styles.viewMoreText}>View More</ThemedText>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.card}>
             {recentActivities.map((activity: any) => (
               <View key={activity.id} style={styles.notificationItem}>
@@ -193,7 +197,7 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
-        
+
         {/* Modules Quick Access */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Modules Quick Access</ThemedText>
@@ -232,11 +236,11 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </ScrollView>
         </View>
-        
+
         {/* AI-Powered Suggestions */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Suggested For You</ThemedText>
-          
+
           <View style={styles.card}>
             {suggestions.map((suggestion: any) => (
               <TouchableOpacity key={suggestion.id} style={styles.suggestionItem}>

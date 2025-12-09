@@ -1,77 +1,49 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import CommunityDashboard from './Dashboard';
+import CommunityPulseDashboard from './Dashboard';
 import DiscussionForum from './DiscussionForum';
-import PollsSection from './PollsSection';
-import PollDetail from './PollDetail';
-import CreatePoll from './CreatePoll';
 import CreateDiscussion from './CreateDiscussion';
 import DiscussionDetail from './DiscussionDetail';
+import PollsSection from './PollsSection';
+import CreatePoll from './CreatePoll';
+import PollDetail from './PollDetail';
 
 const Stack = createNativeStackNavigator();
 
 export default function CommunityLayout() {
   return (
     <Stack.Navigator 
-      initialRouteName="Dashboard"
-      screenOptions={{
-        headerShown: false,
-        animation: 'slide_from_right',
-        gestureEnabled: true,
-        animationTypeForReplace: 'push',
-      }}
+      screenOptions={{ headerShown: false }}
+      initialRouteName="CommunityDashboard"
     >
       <Stack.Screen 
-        name="Dashboard" 
-        component={CommunityDashboard}
-        options={{
-          title: 'Community',
-        }}
+        name="CommunityDashboard" 
+        component={CommunityPulseDashboard} 
       />
       <Stack.Screen 
         name="DiscussionForum" 
-        component={DiscussionForum}
-        options={{
-          title: 'Discussions',
-        }}
-      />
-      <Stack.Screen 
-        name="PollsSection" 
-        component={PollsSection}
-        options={{
-          title: 'Polls',
-        }}
-      />
-      <Stack.Screen 
-        name="PollDetail" 
-        component={PollDetail}
-        options={{
-          title: 'Poll Detail',
-        }}
-      />
-      <Stack.Screen 
-        name="CreatePoll" 
-        component={CreatePoll}
-        options={{
-          title: 'Create Poll',
-          animation: 'slide_from_bottom',
-        }}
+        component={DiscussionForum} 
       />
       <Stack.Screen 
         name="CreateDiscussion" 
-        component={CreateDiscussion}
-        options={{
-          title: 'Create Discussion',
-          animation: 'slide_from_bottom',
-        }}
+        component={CreateDiscussion} 
       />
       <Stack.Screen 
         name="DiscussionDetail" 
-        component={DiscussionDetail}
-        options={{
-          title: 'Discussion',
-        }}
+        component={DiscussionDetail} 
       />
-   </Stack.Navigator>
+      <Stack.Screen 
+        name="PollsSection" 
+        component={PollsSection} 
+      />
+      <Stack.Screen 
+        name="CreatePoll" 
+        component={CreatePoll} 
+      />
+      <Stack.Screen 
+        name="PollDetail" 
+        component={PollDetail} 
+      />
+    </Stack.Navigator>
   );
 }

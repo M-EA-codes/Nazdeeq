@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useNavigation } from '@react-navigation/native';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -37,17 +38,18 @@ interface Poll {
   allowMultipleVotes: boolean;
   isAnonymous: boolean;
   totalVotes: number;
-  created_at: string;
+  createdAt: string;
   location: string;
 }
 
-export default function PollsSection({ navigation }: { navigation: any }) {
+export default function PollsSection() {
+  const navigation = useNavigation<any>();
   const [polls, setPolls] = useState<Poll[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [sortBy, setSortBy] = useState('created_at');
+  const [sortBy, setSortBy] = useState('createdAt');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterActive, setFilterActive] = useState('all');
@@ -63,7 +65,7 @@ export default function PollsSection({ navigation }: { navigation: any }) {
   ];
 
   const sortOptions = [
-    { id: 'created_at', name: 'Latest' },
+    { id: 'createdAt', name: 'Latest' },
     { id: 'totalVotes', name: 'Most Voted' },
     { id: 'endDate', name: 'Ending Soon' }
   ];
@@ -116,28 +118,14 @@ export default function PollsSection({ navigation }: { navigation: any }) {
       const response = await api.get(`/polls?${params.toString()}`);
       console.log('Polls response:', response);
       
-      // Handle different response structures
+      // Handle response structure
       let pollsData = [];
-      if (Array.isArray(response)) {
-        pollsData = response;
-      } else if (response && response.polls && Array.isArray(response.polls)) {
+      if (response && response.polls && Array.isArray(response.polls)) {
         pollsData = response.polls;
-      } else if (response && response.data) {
-        if (Array.isArray(response.data)) {
-          pollsData = response.data;
-        } else if (response.data.polls) {
-          pollsData = response.data.polls;
-        }
+      } else if (Array.isArray(response)) {
+        pollsData = response;
       }
       
-      // Filter by search query if provided
-      if (searchQuery.trim()) {
-        pollsData = pollsData.filter((poll: Poll) => 
-          poll.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          poll.question.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      }
-
       setPolls(pollsData);
     } catch (error) {
       console.error('Error fetching polls:', error);
@@ -220,7 +208,10 @@ export default function PollsSection({ navigation }: { navigation: any }) {
     return (
       <TouchableOpacity
         style={styles.pollCard}
-        onPress={() => navigation.navigate('PollDetail', { pollId: item._id })}
+        onPress={() => {
+          console.log('Navigating to poll detail with ID:', item._id);
+          navigation.navigate('PollDetail', { id: item._id });
+        }}
       >
         <View style={styles.pollHeader}>
           <View style={styles.pollMeta}>
@@ -236,7 +227,7 @@ export default function PollsSection({ navigation }: { navigation: any }) {
               <MaterialIcons name="visibility-off" size={14} color="#666" style={styles.anonymousIcon} />
             )}
           </View>
-          <ThemedText style={styles.timeAgo}>{getTimeAgo(item.created_at)}</ThemedText>
+          <ThemedText style={styles.timeAgo}>{getTimeAgo(item.createdAt)}</ThemedText>
         </View>
 
         <ThemedText style={styles.pollTitle}>{item.title}</ThemedText>

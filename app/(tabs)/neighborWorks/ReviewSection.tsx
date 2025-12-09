@@ -27,7 +27,7 @@ export default function ReviewSection({ route }: { route: any }) {
         return;
       }
       try {
-        const res = await fetch(`${config.API_URL}/neighbor-works/provider/${userId}/reviews`);
+        const res = await fetch(`${config.API_URL}/neighbor-works/reviews/${userId}`);
         const data = await res.json();
         setReviews(data);
       } catch {}

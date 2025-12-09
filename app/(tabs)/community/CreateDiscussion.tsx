@@ -14,8 +14,10 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ThemedText } from '@/components/ThemedText';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 
-export default function CreateDiscussion({ navigation }: { navigation: any }) {
+export default function CreateDiscussion() {
+  const router = useRouter();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('other');
@@ -85,7 +87,7 @@ export default function CreateDiscussion({ navigation }: { navigation: any }) {
 
       await api.post('/discussions', discussionData);
       Alert.alert('Success', 'Discussion created successfully!', [
-        { text: 'OK', onPress: () => navigation.goBack() }
+        { text: 'OK', onPress: () => router.back() }
       ]);
     } catch (error) {
       console.error('Error creating discussion:', error);
@@ -104,7 +106,7 @@ export default function CreateDiscussion({ navigation }: { navigation: any }) {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
             style={styles.backButton}
           >
             <MaterialIcons name="arrow-back" size={24} color="#fff" />

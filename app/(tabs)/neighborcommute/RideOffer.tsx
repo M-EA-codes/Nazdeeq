@@ -176,7 +176,16 @@ export default function RideOffer() {
       );
     } catch (error: any) {
       console.error('Offer ride error:', error);
-      const message = error.response?.data?.error || 'Failed to offer ride. Please try again.';
+      let message = 'Failed to offer ride. Please try again.';
+      
+      if (error.message.includes('Unable to connect to server')) {
+        message = 'Unable to connect to server. Please check your internet connection and ensure the server is running.';
+      } else if (error.response?.data?.error) {
+        message = error.response.data.error;
+      } else if (error.message) {
+        message = error.message;
+      }
+      
       Alert.alert('Error', message);
     } finally {
       setLoading(false);

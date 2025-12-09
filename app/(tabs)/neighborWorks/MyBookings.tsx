@@ -9,16 +9,13 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
-  Dimensions,
-  Linking,
-  Modal,
-  TextInput
+  Dimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ProfileImage from '@/components/ProfileImage';
 
 const { width } = Dimensions.get('window');
 
@@ -51,17 +48,14 @@ interface Booking {
   createdAt: string;
 }
 
-export default function MyBookings({ navigation }: { navigation: any }) {
+export default function MyBookings() {
+  const navigation = useNavigation();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userType, setUserType] = useState<'provider' | 'customer'>('customer');
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
-  const [ratingModalVisible, setRatingModalVisible] = useState(false);
-  const [ratingValue, setRatingValue] = useState(5);
-  const [ratingComment, setRatingComment] = useState('');
-  const [ratingTarget, setRatingTarget] = useState<Booking | null>(null);
 
   useEffect(() => {
     fetchUserData();
@@ -156,43 +150,6 @@ export default function MyBookings({ navigation }: { navigation: any }) {
     return `https://via.placeholder.com/50x50/${colors[colorIndex].substring(1)}/ffffff?text=${initial}`;
   };
 
-  const handleContact = (booking: Booking) => {
-    const otherUser = userType === 'provider' ? booking.requesterId : booking.providerId;
-    const phone = otherUser?.phoneNumber;
-    if (!phone) {
-      Alert.alert('Unavailable', 'Phone number not provided.');
-      return;
-    }
-    Linking.openURL(`tel:${phone}`).catch(() =>
-      Alert.alert('Error', 'Unable to start a call on this device.')
-    );
-  };
-
-  const openRatingModal = (booking: Booking) => {
-    setRatingTarget(booking);
-    setRatingValue(5);
-    setRatingComment('');
-    setRatingModalVisible(true);
-  };
-
-  const submitRating = async () => {
-    if (!ratingTarget || !userId) return;
-    try {
-      await api.post('/neighbor-works/review', {
-        reviewerId: userId,
-        revieweeId: ratingTarget.providerId?._id,
-        rating: ratingValue,
-        comment: ratingComment.trim(),
-      });
-      Alert.alert('Thanks!', 'Your rating has been submitted.');
-      setRatingModalVisible(false);
-      setRatingTarget(null);
-    } catch (error) {
-      console.error('Error submitting rating:', error);
-      Alert.alert('Error', 'Failed to submit rating.');
-    }
-  };
-
   const getFilteredBookings = () => {
     let filtered = bookings;
     
@@ -207,16 +164,15 @@ export default function MyBookings({ navigation }: { navigation: any }) {
 
   const renderBookingCard = (booking: Booking) => {
     const otherUser = userType === 'provider' ? booking.requesterId : booking.providerId;
+    const profileImage = otherUser?.profilePhoto || 
+                        generateProfileImage(otherUser?._id || '', otherUser?.fullName || '');
 
     return (
       <View key={booking._id} style={styles.bookingCard}>
         <View style={styles.bookingHeader}>
           <View style={styles.userInfo}>
-            <ProfileImage
-              source={otherUser?.profilePhoto}
-              userId={otherUser?._id}
-              userName={otherUser?.fullName}
-              size={50}
+            <Image
+              source={{ uri: profileImage }}
               style={styles.userAvatar}
             />
             <View style={styles.userDetails}>
@@ -256,7 +212,7 @@ export default function MyBookings({ navigation }: { navigation: any }) {
           
           {booking.estimatedBudget && (
             <View style={styles.detailItem}>
-            <MaterialIcons name="attach-money" size={18} color="#666" />
+              <MaterialIcons name="attach_money" size={18} color="#666" />
               <Text style={styles.detailText}>${booking.estimatedBudget}</Text>
             </View>
           )}
@@ -290,7 +246,7 @@ export default function MyBookings({ navigation }: { navigation: any }) {
               style={[styles.actionButton, styles.startButton]}
               onPress={() => handleStatusUpdate(booking._id, 'in_progress')}
             >
-              <MaterialIcons name="play-arrow" size={18} color="#fff" />
+              <MaterialIcons name="play_arrow" size={18} color="#fff" />
               <Text style={styles.actionButtonText}>Start Work</Text>
             </TouchableOpacity>
           </View>
@@ -310,22 +266,12 @@ export default function MyBookings({ navigation }: { navigation: any }) {
         )}
 
         {/* Contact Button */}
-        <TouchableOpacity style={styles.contactButton} onPress={() => handleContact(booking)}>
+        <TouchableOpacity style={styles.contactButton}>
           <MaterialIcons name="phone" size={18} color="#4b32c3" />
           <Text style={styles.contactButtonText}>
             Contact {userType === 'provider' ? 'Customer' : 'Provider'}
           </Text>
         </TouchableOpacity>
-
-        {userType === 'customer' && booking.status === 'completed' && (
-          <TouchableOpacity
-            style={[styles.contactButton, styles.rateButton]}
-            onPress={() => openRatingModal(booking)}
-          >
-            <MaterialIcons name="star-rate" size={18} color="#4b32c3" />
-            <Text style={styles.contactButtonText}>Rate Provider</Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   };
@@ -376,57 +322,6 @@ export default function MyBookings({ navigation }: { navigation: any }) {
         </TouchableOpacity>
       </View>
 
-      {/* Rating Modal */}
-      <Modal visible={ratingModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Rate Provider</Text>
-            <Text style={styles.modalLabel}>Rating (1-5)</Text>
-            <View style={styles.ratingRow}>
-              {[1,2,3,4,5].map((val) => (
-                <TouchableOpacity
-                  key={val}
-                  style={[
-                    styles.ratingCircle,
-                    ratingValue === val && styles.ratingCircleActive
-                  ]}
-                  onPress={() => setRatingValue(val)}
-                >
-                  <Text style={[
-                    styles.ratingCircleText,
-                    ratingValue === val && styles.ratingCircleTextActive
-                  ]}>
-                    {val}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={styles.modalLabel}>Comment (optional)</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Write a short review..."
-              value={ratingComment}
-              onChangeText={setRatingComment}
-              multiline
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalCancel]}
-                onPress={() => setRatingModalVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalSubmit]}
-                onPress={submitRating}
-              >
-                <Text style={[styles.modalButtonText, { color: '#fff' }]}>Submit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       {/* Filter Tabs */}
       <View style={styles.tabsContainer}>
         {(['all', 'pending', 'completed'] as const).map((tab) => (
@@ -470,7 +365,7 @@ export default function MyBookings({ navigation }: { navigation: any }) {
             getFilteredBookings().map(renderBookingCard)
           ) : (
             <View style={styles.emptyContainer}>
-              <MaterialIcons name="event-busy" size={64} color="rgba(255,255,255,0.3)" />
+              <MaterialIcons name="event_busy" size={64} color="rgba(255,255,255,0.3)" />
               <Text style={styles.emptyText}>No bookings found</Text>
               <Text style={styles.emptySubtext}>
                 {userType === 'customer' 
@@ -704,10 +599,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  rateButton: {
-    marginTop: 8,
-    backgroundColor: 'rgba(75, 50, 195, 0.08)',
-  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -724,84 +615,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    width: '100%',
-    borderRadius: 12,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 16,
-    color: '#333',
-  },
-  modalLabel: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 8,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  ratingCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ratingCircleActive: {
-    borderColor: '#4b32c3',
-    backgroundColor: 'rgba(75,50,195,0.1)',
-  },
-  ratingCircleText: {
-    color: '#444',
-    fontWeight: '600',
-  },
-  ratingCircleTextActive: {
-    color: '#4b32c3',
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    marginBottom: 16,
-    color: '#333',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  modalButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  modalCancel: {
-    backgroundColor: '#f0f0f0',
-  },
-  modalSubmit: {
-    backgroundColor: '#4b32c3',
-  },
-  modalButtonText: {
-    color: '#333',
-    fontWeight: '700',
   },
 });

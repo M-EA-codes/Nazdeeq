@@ -80,17 +80,26 @@ export default function MyRides() {
     
     try {
       setLoading(true);
-      const response = await api.get('/rides/my-rides', {
-        params: { userId }
+      const response = await api.get(`/rides/my-rides?userId=${userId}`);
+      
+      const { offered, joined } = response;
+      
+      // Combine and mark ride types, ensuring uniqueness
+      const rideMap = new Map();
+      
+      // Add offered rides
+      offered.forEach((ride: any) => {
+        rideMap.set(ride._id, { ...ride, type: 'offered' as const });
       });
       
-      const { offered, joined } = response.data;
+      // Add joined rides (only if not already in map)
+      joined.forEach((ride: any) => {
+        if (!rideMap.has(ride._id)) {
+          rideMap.set(ride._id, { ...ride, type: 'joined' as const });
+        }
+      });
       
-      // Combine and mark ride types
-      const allRides: MyRide[] = [
-        ...offered.map((ride: any) => ({ ...ride, type: 'offered' as const })),
-        ...joined.map((ride: any) => ({ ...ride, type: 'joined' as const }))
-      ];
+      const allRides: MyRide[] = Array.from(rideMap.values());
       
       // Sort by date (most recent first)
       allRides.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());

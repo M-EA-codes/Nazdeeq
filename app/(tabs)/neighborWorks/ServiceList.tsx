@@ -16,10 +16,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ProfileImage from '@/components/ProfileImage';
 
 const { width } = Dimensions.get('window');
 
@@ -66,7 +66,7 @@ interface BookingData {
   estimatedBudget?: number;
 }
 
-export default function ServiceList({ navigation }: { navigation: any }) {
+export default function ServiceList() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -111,6 +111,14 @@ export default function ServiceList({ navigation }: { navigation: any }) {
     fetchServices();
   }, []);
 
+  // Refresh services when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🔄 ServiceList focused, refreshing ALL services...');
+      fetchServices(selectedCategory, searchQuery);
+    }, [selectedCategory, searchQuery])
+  );
+
   const fetchUserData = async () => {
     try {
       const storedUserId = await AsyncStorage.getItem('userId');
@@ -133,8 +141,11 @@ export default function ServiceList({ navigation }: { navigation: any }) {
       if (category && category !== 'all') params.category = category;
       if (search) params.search = search;
 
+      console.log('🔍 Fetching ALL services from main collection with params:', params);
       const response = await api.get('/services', { params });
-      setServices(response.data);
+      console.log('🔍 API Response:', response);
+      console.log('🔍 Found services:', response?.length || 0);
+      setServices(response || []);
     } catch (error) {
       console.error('Error fetching services:', error);
       Alert.alert('Error', 'Failed to load services. Please try again.');
@@ -175,6 +186,11 @@ export default function ServiceList({ navigation }: { navigation: any }) {
     setSelectedTimeSlot('');
     setUrgency('medium');
     setEstimatedBudget('');
+    
+    // Reset date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setSelectedDate(tomorrow);
   };
 
   const handleBookService = async () => {
@@ -208,6 +224,13 @@ export default function ServiceList({ navigation }: { navigation: any }) {
       };
 
       await api.post('/service-requests', bookingData);
+      
+      // Clear booking form after successful submission
+      setBookingDescription('');
+      setSelectedTimeSlot('');
+      setUrgency('medium');
+      setEstimatedBudget('');
+      setSelectedDate(new Date());
       
       Alert.alert(
         'Booking Confirmed!',
@@ -258,6 +281,9 @@ export default function ServiceList({ navigation }: { navigation: any }) {
   );
 
   const renderService = ({ item }: { item: Service }) => {
+    const profileImage = item.providerId.profilePhoto || 
+                        generateProfileImage(item.providerId._id, item.providerId.fullName);
+    
     return (
       <LinearGradient
         colors={["#fff", "#f8f9ff"]}
@@ -267,11 +293,8 @@ export default function ServiceList({ navigation }: { navigation: any }) {
       >
         <View style={styles.serviceHeader}>
           <View style={styles.providerInfo}>
-            <ProfileImage
-              source={item.providerId.profilePhoto}
-              userId={item.providerId._id}
-              userName={item.providerId.fullName}
-              size={60}
+            <Image 
+              source={{ uri: profileImage }}
               style={styles.providerAvatar}
             />
             <View style={styles.providerDetails}>
@@ -334,10 +357,7 @@ export default function ServiceList({ navigation }: { navigation: any }) {
         )}
 
         <View style={styles.serviceActions}>
-          <TouchableOpacity 
-            style={styles.contactButton}
-            onPress={() => navigation.navigate('ProviderProfile', { providerId: item.providerId._id })}
-          >
+          <TouchableOpacity style={styles.contactButton}>
             <MaterialIcons name="phone" size={18} color="#4b32c3" />
             <Text style={styles.contactButtonText}>Contact</Text>
           </TouchableOpacity>

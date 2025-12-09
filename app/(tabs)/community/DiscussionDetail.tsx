@@ -1,38 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
+import { 
+  View, 
+  Text, 
+  ScrollView, 
+  StyleSheet, 
+  ActivityIndicator, 
   Alert,
-  RefreshControl,
+  TouchableOpacity,
+  TextInput,
+  FlatList,
   KeyboardAvoidingView,
-  Platform,
-  Modal,
+  Platform
 } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
+import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface Author {
-  _id: string;
-  fullName: string;
-  profilePhoto?: string;
-  rating: number;
-}
-
 interface Comment {
   _id: string;
   content: string;
-  authorId: Author;
+  authorId: {
+    _id: string;
+    fullName: string;
+    profilePhoto?: string;
+  };
+  createdAt: string;
   upvotes: string[];
   downvotes: string[];
-  created_at: string;
-  parentCommentId?: string;
-  replies?: Comment[];
 }
 
 interface Discussion {
@@ -40,59 +38,55 @@ interface Discussion {
   title: string;
   content: string;
   category: string;
-  authorId: Author;
+  authorId: {
+    _id: string;
+    fullName: string;
+    profilePhoto?: string;
+  };
+  createdAt: string;
   upvotes: string[];
   downvotes: string[];
-  commentCount: number;
   viewCount: number;
-  created_at: string;
-  isResolved: boolean;
-  isPinned: boolean;
-  tags: string[];
-  location: string;
-  priority: string;
+  commentCount: number;
+  comments?: Comment[];
 }
 
-export default function DiscussionDetail({ route, navigation }: { route: any, navigation: any }) {
-  // Add safety check for route params
-  const discussionId = route?.params?.discussionId;
-  
-  if (!discussionId) {
-    return (
-      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
-        <View style={styles.errorContainer}>
-          <ThemedText style={styles.errorText}>Discussion ID not provided</ThemedText>
-          <TouchableOpacity 
-            onPress={() => navigation?.goBack?.()}
-            style={styles.backButton}
-          >
-            <ThemedText style={styles.backButtonText}>Go Back</ThemedText>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    );
-  }
-
+export default function DiscussionDetail() {
+  const navigation = useNavigation<any>();
+  const route = useRoute();
+  const params = route.params as { id: string };
   const [discussion, setDiscussion] = useState<Discussion | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [replyToComment, setReplyToComment] = useState<string | null>(null);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reportReason, setReportReason] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [voting, setVoting] = useState(false);
+
+  // Get the ID from params
+  const discussionId = params?.id;
 
   useEffect(() => {
     fetchUserData();
   }, []);
 
   useEffect(() => {
-    if (userId) {
-      fetchDiscussion();
-      fetchComments();
+    console.log('DiscussionDetail mounted');
+    console.log('All params:', params);
+    console.log('Discussion ID from params:', discussionId);
+    
+    if (discussionId) {
+      fetchDiscussion(discussionId);
+      fetchComments(discussionId);
+    } else {
+      console.error('No discussion ID provided in params');
+      Alert.alert(
+        'Error', 
+        'No discussion ID provided',
+        [{ text: 'Go Back', onPress: () => navigation.goBack() }]
+      );
     }
-  }, [userId, discussionId]);
+  }, [discussionId]);
 
   const fetchUserData = async () => {
     try {
@@ -109,191 +103,244 @@ export default function DiscussionDetail({ route, navigation }: { route: any, na
     }
   };
 
-  const fetchDiscussion = async () => {
+  const fetchDiscussion = async (id: string) => {
     try {
-      const response = await api.get(`/discussions/${discussionId}`);
-      setDiscussion(response.data);
-    } catch (error) {
-      console.error('Error fetching discussion:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const fetchComments = async () => {
-    try {
-      const response = await api.get(`/discussions/${discussionId}/comments`);
-      // Handle response structure - API returns { comments: [...] }
-      const commentsData = response.data?.comments || response.data || [];
-      setComments(Array.isArray(commentsData) ? commentsData : []);
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-      setComments([]); // Set empty array on error
-    }
-  };
-
-  const handleVote = async (type: 'discussion' | 'comment', id: string, voteType: 'up' | 'down') => {
-    try {
-      const endpoint = type === 'discussion' ? `/discussions/${id}/vote` : `/comments/${id}/vote`;
-      await api.post(endpoint, { userId, voteType });
+      setLoading(true);
+      console.log('Fetching discussion with ID:', id);
       
-      if (type === 'discussion') {
-        fetchDiscussion();
+      const response = await api.get(`/discussions/${id}`);
+      console.log('Discussion response:', response);
+      
+      if (response) {
+        setDiscussion(response);
       } else {
-        fetchComments();
+        throw new Error('No discussion data received');
       }
     } catch (error) {
-      console.error('Error voting:', error);
+      console.error('Error fetching discussion:', error);
+      Alert.alert(
+        'Discussion Not Found',
+        'The discussion you are looking for could not be found.',
+        [
+          { text: 'Go Back', onPress: () => navigation.goBack() }
+        ]
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAddComment = async () => {
-    if (!newComment.trim()) return;
-
+  const fetchComments = async (id: string) => {
     try {
-      const commentData = {
-        discussionId,
-        authorId: userId,
-        content: newComment.trim(),
-        parentCommentId: replyToComment,
-      };
-
-      await api.post('/comments', commentData);
-      setNewComment('');
-      setReplyToComment(null);
-      fetchComments();
-      fetchDiscussion(); // Update comment count
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      Alert.alert('Error', 'Failed to add comment');
+      console.log('Fetching comments for discussion:', id);
+      const response = await api.get(`/discussions/${id}/comments`);
+      console.log('Comments response:', response);
+      
+      if (response && Array.isArray(response)) {
+        setComments(response);
+        console.log('Set comments from array:', response.length);
+      } else if (response && response.comments) {
+        setComments(response.comments);
+        console.log('Set comments from object:', response.comments.length);
+      } else {
+        console.log('No comments found or unexpected response format');
+        setComments([]);
+      }
+    } catch (error: unknown) {
+      console.error('Error fetching comments:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+      }
+      // Comments are optional, so we don't show an error
     }
   };
 
-  const handleReport = async () => {
-    if (!reportReason.trim()) {
-      Alert.alert('Error', 'Please provide a reason for reporting');
-      return;
-    }
-
-    try {
-      await api.post(`/discussions/${discussionId}/report`, {
-        userId,
-        reason: reportReason.trim(),
-      });
-      setShowReportModal(false);
-      setReportReason('');
-      Alert.alert('Success', 'Discussion reported successfully');
-    } catch (error) {
-      console.error('Error reporting discussion:', error);
-      Alert.alert('Error', 'Failed to report discussion');
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchDiscussion();
-    fetchComments();
-  };
-
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+  const handleVote = async (voteType: 'up' | 'down') => {
+    if (!userId || !discussionId || voting) return;
     
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+    try {
+      setVoting(true);
+      await api.post(`/discussions/${discussionId}/vote`, {
+        userId,
+        voteType
+      });
+      
+      // Refresh discussion data
+      await fetchDiscussion(discussionId);
+    } catch (error) {
+      console.error('Error voting:', error);
+      Alert.alert('Error', 'Failed to vote. Please try again.');
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const handleCommentVote = async (commentId: string, voteType: 'up' | 'down') => {
+    if (!userId || voting) return;
+    
+    try {
+      setVoting(true);
+      await api.post(`/comments/${commentId}/vote`, {
+        userId,
+        voteType
+      });
+      
+      // Refresh comments
+      await fetchComments(discussionId);
+    } catch (error) {
+      console.error('Error voting on comment:', error);
+      Alert.alert('Error', 'Failed to vote. Please try again.');
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  const submitComment = async () => {
+    if (!newComment.trim() || !userId || !discussionId || submittingComment) return;
+    
+    try {
+      setSubmittingComment(true);
+      console.log('Submitting comment to:', `/discussions/${discussionId}/comments`);
+      console.log('Comment data:', { content: newComment.trim(), authorId: userId });
+      
+      // First test if server is reachable
+      try {
+        const healthCheck = await api.get('/health');
+        console.log('Server health check:', healthCheck);
+      } catch (healthError) {
+        console.error('Server health check failed:', healthError);
+        Alert.alert('Error', 'Server is not reachable. Please check if the server is running.');
+        return;
+      }
+      
+      const response = await api.post(`/discussions/${discussionId}/comments`, {
+        content: newComment.trim(),
+        authorId: userId
+      });
+      
+      console.log('Comment submission response:', response);
+      
+      setNewComment('');
+      await fetchComments(discussionId);
+      
+      // Update comment count
+      if (discussion) {
+        setDiscussion({
+          ...discussion,
+          commentCount: discussion.commentCount + 1
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting comment:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message);
+        Alert.alert('Error', `Failed to submit comment: ${error.message}`);
+      } else {
+        console.error('Error details: Unknown error');
+        Alert.alert('Error', 'Failed to submit comment. Please try again.');
+      }
+    } finally {
+      setSubmittingComment(false);
+    }
+  };
+
+  const formatDate = (dateString: string | undefined) => {
+    try {
+      if (!dateString) return 'Unknown date';
+      
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date string:', dateString);
+        return 'Unknown date';
+      }
+      
+      const now = new Date();
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+      
+      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+      if (diffInMinutes < 10080) return `${Math.floor(diffInMinutes / 1440)}d ago`;
+      
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Unknown date';
+    }
   };
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
-      infrastructure: '#FF6B6B',
-      safety: '#4ECDC4',
-      environment: '#45B7D1',
-      community: '#96CEB4',
-      government: '#FFEAA7',
-      other: '#DDA0DD'
+      infrastructure: '#ff6b6b',
+      safety: '#4ecdc4',
+      environment: '#45b7d1',
+      community: '#96ceb4',
+      government: '#feca57',
+      other: '#a0a0a0'
     };
     return colors[category] || colors.other;
   };
 
-  const getPriorityColor = (priority: string) => {
-    const colors: { [key: string]: string } = {
-      low: '#4ECDC4',
-      medium: '#45B7D1',
-      high: '#FFA07A',
-      urgent: '#FF6B6B'
+  const hasUserVoted = (upvotes: string[], downvotes: string[]) => {
+    if (!userId) return { hasUpvoted: false, hasDownvoted: false };
+    return {
+      hasUpvoted: upvotes.includes(userId),
+      hasDownvoted: downvotes.includes(userId)
     };
-    return colors[priority] || colors.low;
   };
 
-  const renderComment = (comment: Comment, isReply = false) => {
-    // Handle both vote structures: { upvotes, downvotes } or { votes }
-    const upvotes = comment.upvotes || [];
-    const downvotes = comment.downvotes || [];
-    const voteScore = upvotes.length - downvotes.length;
-    const hasUpvoted = upvotes.includes(userId || '');
-    const hasDownvoted = downvotes.includes(userId || '');
-
+  const renderComment = ({ item }: { item: Comment }) => {
+    const { hasUpvoted, hasDownvoted } = hasUserVoted(item.upvotes, item.downvotes);
+    
     return (
-      <View key={comment._id} style={[styles.commentContainer, isReply && styles.replyContainer]}>
+      <View style={styles.commentCard}>
         <View style={styles.commentHeader}>
           <View style={styles.commentAuthor}>
-            <ThemedText style={styles.commentAuthorName}>{comment.authorId.fullName}</ThemedText>
-            <ThemedText style={styles.commentTime}>{getTimeAgo(comment.created_at)}</ThemedText>
+            <MaterialIcons name="person" size={16} color="#666" />
+            <Text style={styles.commentAuthorName}>{item.authorId.fullName}</Text>
           </View>
-          {!isReply && (
-            <TouchableOpacity
-              style={styles.replyButton}
-              onPress={() => setReplyToComment(comment._id)}
-            >
-              <MaterialIcons name="reply" size={16} color="#666" />
-            </TouchableOpacity>
-          )}
+          <Text style={styles.commentDate}>{formatDate(item.createdAt)}</Text>
         </View>
         
-        <ThemedText style={styles.commentContent}>{comment.content}</ThemedText>
+        <Text style={styles.commentContent}>{item.content}</Text>
         
-        <View style={styles.commentFooter}>
-          <View style={styles.commentVotes}>
-            <TouchableOpacity
-              style={[styles.voteButton, hasUpvoted && styles.voteButtonActive]}
-              onPress={() => handleVote('comment', comment._id, 'up')}
-            >
-              <MaterialIcons 
-                name="keyboard-arrow-up" 
-                size={18} 
-                color={hasUpvoted ? '#4ECDC4' : '#666'} 
-              />
-            </TouchableOpacity>
-            
-            <ThemedText style={[styles.voteScore, { 
-              color: voteScore > 0 ? '#4ECDC4' : voteScore < 0 ? '#FF6B6B' : '#666' 
-            }]}>
-              {voteScore}
-            </ThemedText>
-            
-            <TouchableOpacity
-              style={[styles.voteButton, hasDownvoted && styles.voteButtonActive]}
-              onPress={() => handleVote('comment', comment._id, 'down')}
-            >
-              <MaterialIcons 
-                name="keyboard-arrow-down" 
-                size={18} 
-                color={hasDownvoted ? '#FF6B6B' : '#666'} 
-              />
-            </TouchableOpacity>
-          </View>
+        <View style={styles.commentActions}>
+          <TouchableOpacity
+            style={[styles.commentVoteButton, hasUpvoted && styles.commentVoteButtonActive]}
+            onPress={() => handleCommentVote(item._id, 'up')}
+            disabled={voting}
+          >
+            <MaterialIcons 
+              name="thumb-up" 
+              size={16} 
+              color={hasUpvoted ? '#4c669f' : '#666'} 
+            />
+            <Text style={[styles.commentVoteText, hasUpvoted && styles.commentVoteTextActive]}>
+              {item.upvotes.length}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.commentVoteButton, hasDownvoted && styles.commentVoteButtonActive]}
+            onPress={() => handleCommentVote(item._id, 'down')}
+            disabled={voting}
+          >
+            <MaterialIcons 
+              name="thumb-down" 
+              size={16} 
+              color={hasDownvoted ? '#ff6b6b' : '#666'} 
+            />
+            <Text style={[styles.commentVoteText, hasDownvoted && styles.commentVoteTextActive]}>
+              {item.downvotes.length}
+            </Text>
+          </TouchableOpacity>
         </View>
-
-        {/* Render replies */}
-        {comment.replies && comment.replies.length > 0 && (
-          <View style={styles.repliesContainer}>
-            {comment.replies.map(reply => renderComment(reply, true))}
-          </View>
-        )}
       </View>
     );
   };
@@ -301,7 +348,8 @@ export default function DiscussionDetail({ route, navigation }: { route: any, na
   if (loading) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
-        <View style={styles.loadingContainer}>
+        <View style={[styles.container, styles.centered]}>
+          <ActivityIndicator size="large" color="#fff" />
           <ThemedText style={styles.loadingText}>Loading discussion...</ThemedText>
         </View>
       </LinearGradient>
@@ -311,19 +359,21 @@ export default function DiscussionDetail({ route, navigation }: { route: any, na
   if (!discussion) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
-        <View style={styles.errorContainer}>
+        <View style={[styles.container, styles.centered]}>
+          <MaterialIcons name="error" size={64} color="#fff" />
           <ThemedText style={styles.errorText}>Discussion not found</ThemedText>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
     );
   }
 
-  // Safety check for upvotes/downvotes
-  const upvotes = discussion?.upvotes || [];
-  const downvotes = discussion?.downvotes || [];
-  const voteScore = upvotes.length - downvotes.length;
-  const hasUpvoted = upvotes.includes(userId || '');
-  const hasDownvoted = downvotes.includes(userId || '');
+  const { hasUpvoted, hasDownvoted } = hasUserVoted(discussion.upvotes, discussion.downvotes);
 
   return (
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
@@ -335,197 +385,122 @@ export default function DiscussionDetail({ route, navigation }: { route: any, na
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={styles.backButton}
+            style={styles.backIcon}
           >
             <MaterialIcons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <ThemedText style={styles.title}>Discussion</ThemedText>
-          <TouchableOpacity
-            onPress={() => setShowReportModal(true)}
-            style={styles.reportButton}
-          >
-            <MaterialIcons name="flag" size={20} color="#fff" />
-          </TouchableOpacity>
+          <ThemedText style={styles.headerTitle}>Discussion</ThemedText>
+          <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView 
-          style={styles.content}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Discussion Content */}
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.discussionCard}>
-            <View style={styles.discussionHeader}>
-              <View style={styles.discussionMeta}>
-                <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(discussion.category) }]}>
-                  <ThemedText style={styles.categoryText}>{discussion.category}</ThemedText>
-                </View>
-                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(discussion.priority) }]}>
-                  <ThemedText style={styles.priorityText}>{discussion.priority}</ThemedText>
-                </View>
-                {discussion.isPinned && (
-                  <MaterialIcons name="push-pin" size={16} color="#FF6B6B" style={styles.pinnedIcon} />
-                )}
-                {discussion.isResolved && (
-                  <MaterialIcons name="check-circle" size={16} color="#4ECDC4" style={styles.resolvedIcon} />
-                )}
-              </View>
-              <ThemedText style={styles.timeAgo}>{getTimeAgo(discussion.created_at)}</ThemedText>
+            {/* Category Tag */}
+            <View style={[styles.categoryTag, { backgroundColor: getCategoryColor(discussion.category) }]}>
+              <Text style={styles.categoryText}>{discussion.category.toUpperCase()}</Text>
             </View>
-
-            <ThemedText style={styles.discussionTitle}>{discussion.title}</ThemedText>
-            <ThemedText style={styles.discussionContent}>{discussion.content}</ThemedText>
-
-            {discussion.location && (
-              <View style={styles.locationContainer}>
-                <MaterialIcons name="location-on" size={16} color="#666" />
-                <ThemedText style={styles.locationText}>{discussion.location}</ThemedText>
+            
+            {/* Title */}
+            <Text style={styles.title}>{discussion.title}</Text>
+            
+            {/* Author Info */}
+            <View style={styles.authorInfo}>
+              <View style={styles.authorDetails}>
+                <MaterialIcons name="person" size={20} color="#666" />
+                <Text style={styles.authorName}>{discussion.authorId.fullName}</Text>
               </View>
-            )}
-
-            {discussion.tags.length > 0 && (
-              <View style={styles.tagsContainer}>
-                {discussion.tags.map((tag, index) => (
-                  <View key={index} style={styles.tag}>
-                    <ThemedText style={styles.tagText}>#{tag}</ThemedText>
-                  </View>
-                ))}
+              <Text style={styles.date}>{formatDate(discussion.createdAt)}</Text>
+            </View>
+            
+            {/* Content */}
+            <View style={styles.contentContainer}>
+              <Text style={styles.contentText}>{discussion.content}</Text>
+            </View>
+            
+            {/* Interactive Actions */}
+            <View style={styles.actionsContainer}>
+              <TouchableOpacity
+                style={[styles.actionButton, hasUpvoted && styles.actionButtonActive]}
+                onPress={() => handleVote('up')}
+                disabled={voting || !userId}
+              >
+                <MaterialIcons 
+                  name="thumb-up" 
+                  size={20} 
+                  color={hasUpvoted ? '#4c669f' : '#666'} 
+                />
+                <Text style={[styles.actionText, hasUpvoted && styles.actionTextActive]}>
+                  {discussion.upvotes.length}
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.actionButton, hasDownvoted && styles.actionButtonActive]}
+                onPress={() => handleVote('down')}
+                disabled={voting || !userId}
+              >
+                <MaterialIcons 
+                  name="thumb-down" 
+                  size={20} 
+                  color={hasDownvoted ? '#ff6b6b' : '#666'} 
+                />
+                <Text style={[styles.actionText, hasDownvoted && styles.actionTextActive]}>
+                  {discussion.downvotes.length}
+                </Text>
+              </TouchableOpacity>
+              
+              <View style={styles.actionButton}>
+                <MaterialIcons name="visibility" size={20} color="#666" />
+                <Text style={styles.actionText}>{discussion.viewCount}</Text>
               </View>
-            )}
-
-            <View style={styles.discussionFooter}>
-              <View style={styles.authorInfo}>
-                <ThemedText style={styles.authorName}>by {discussion.authorId.fullName}</ThemedText>
-                <View style={styles.discussionStats}>
-                  <MaterialIcons name="visibility" size={14} color="#666" />
-                  <ThemedText style={styles.statText}>{discussion.viewCount} views</ThemedText>
-                  <MaterialIcons name="comment" size={14} color="#666" style={styles.statIcon} />
-                  <ThemedText style={styles.statText}>{discussion.commentCount} comments</ThemedText>
-                </View>
-              </View>
-
-              <View style={styles.voteSection}>
-                <TouchableOpacity
-                  style={[styles.voteButton, hasUpvoted && styles.voteButtonActive]}
-                  onPress={() => handleVote('discussion', discussion._id, 'up')}
-                >
-                  <MaterialIcons 
-                    name="keyboard-arrow-up" 
-                    size={24} 
-                    color={hasUpvoted ? '#4ECDC4' : '#666'} 
-                  />
-                </TouchableOpacity>
-                
-                <ThemedText style={[styles.voteScore, { 
-                  color: voteScore > 0 ? '#4ECDC4' : voteScore < 0 ? '#FF6B6B' : '#666' 
-                }]}>
-                  {voteScore}
-                </ThemedText>
-                
-                <TouchableOpacity
-                  style={[styles.voteButton, hasDownvoted && styles.voteButtonActive]}
-                  onPress={() => handleVote('discussion', discussion._id, 'down')}
-                >
-                  <MaterialIcons 
-                    name="keyboard-arrow-down" 
-                    size={24} 
-                    color={hasDownvoted ? '#FF6B6B' : '#666'} 
-                  />
-                </TouchableOpacity>
+              
+              <View style={styles.actionButton}>
+                <MaterialIcons name="comment" size={20} color="#666" />
+                <Text style={styles.actionText}>{discussion.commentCount}</Text>
               </View>
             </View>
           </View>
 
           {/* Comments Section */}
           <View style={styles.commentsSection}>
-            <ThemedText style={styles.commentsTitle}>
-              Comments ({comments.length})
-            </ThemedText>
+            <Text style={styles.commentsTitle}>Comments ({comments.length})</Text>
             
-            {comments.map(comment => renderComment(comment))}
+            {/* Add Comment */}
+            {userId && (
+              <View style={styles.addCommentContainer}>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder="Add a comment..."
+                  placeholderTextColor="#999"
+                  value={newComment}
+                  onChangeText={setNewComment}
+                  multiline
+                  maxLength={500}
+                />
+                <TouchableOpacity
+                  style={[styles.submitButton, (!newComment.trim() || submittingComment) && styles.submitButtonDisabled]}
+                  onPress={submitComment}
+                  disabled={!newComment.trim() || submittingComment}
+                >
+                  {submittingComment ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialIcons name="send" size={20} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {/* Comments List */}
+            <FlatList
+              data={comments}
+              keyExtractor={(item) => item._id}
+              renderItem={renderComment}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+            />
           </View>
         </ScrollView>
-
-        {/* Comment Input */}
-        <View style={styles.commentInputContainer}>
-          {replyToComment && (
-            <View style={styles.replyIndicator}>
-              <ThemedText style={styles.replyText}>Replying to comment</ThemedText>
-              <TouchableOpacity onPress={() => setReplyToComment(null)}>
-                <MaterialIcons name="close" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          <View style={styles.commentInput}>
-            <TextInput
-              style={styles.commentTextInput}
-              placeholder="Add a comment..."
-              placeholderTextColor="#666"
-              value={newComment}
-              onChangeText={setNewComment}
-              multiline
-            />
-            <TouchableOpacity
-              style={[styles.sendButton, !newComment.trim() && styles.sendButtonDisabled]}
-              onPress={handleAddComment}
-              disabled={!newComment.trim()}
-            >
-              <MaterialIcons 
-                name="send" 
-                size={20} 
-                color={newComment.trim() ? '#4c669f' : '#ccc'} 
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Report Modal */}
-        <Modal
-          visible={showReportModal}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowReportModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <ThemedText style={styles.modalTitle}>Report Discussion</ThemedText>
-                <TouchableOpacity onPress={() => setShowReportModal(false)}>
-                  <MaterialIcons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-              
-              <ThemedText style={styles.modalDescription}>
-                Please provide a reason for reporting this discussion:
-              </ThemedText>
-              
-              <TextInput
-                style={styles.reportInput}
-                placeholder="Enter reason..."
-                placeholderTextColor="#666"
-                value={reportReason}
-                onChangeText={setReportReason}
-                multiline
-                textAlignVertical="top"
-              />
-              
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => setShowReportModal(false)}
-                >
-                  <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.reportSubmitButton}
-                  onPress={handleReport}
-                >
-                  <ThemedText style={styles.reportSubmitButtonText}>Report</ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -533,208 +508,202 @@ export default function DiscussionDetail({ route, navigation }: { route: any, na
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
-  container: { 
-    flex: 1,
-    paddingTop: 50,
-  },
+  container: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
   },
-  backButton: {
+  backIcon: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  title: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
   },
-  reportButton: {
-    padding: 8,
-  },
-  content: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  
   loadingText: {
-    color: '#fff',
+    marginTop: 16,
     fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    color: '#fff',
   },
   errorText: {
+    fontSize: 18,
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  backButton: {
+    marginTop: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  backButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
   },
+  
+  scrollView: { flex: 1 },
   discussionCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  discussionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  discussionMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  categoryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  
+  categoryTag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 16,
   },
   categoryText: {
-    fontSize: 11,
-    color: '#fff',
-    fontWeight: 'bold',
-    textTransform: 'capitalize',
-  },
-  priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  priorityText: {
-    fontSize: 11,
-    color: '#fff',
-    fontWeight: 'bold',
-    textTransform: 'capitalize',
-  },
-  pinnedIcon: {
-    marginLeft: 4,
-  },
-  resolvedIcon: {
-    marginLeft: 4,
-  },
-  timeAgo: {
     fontSize: 12,
-    color: '#666',
+    color: '#fff',
+    fontWeight: 'bold',
   },
-  discussionTitle: {
-    fontSize: 18,
+  
+  title: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 16,
+    lineHeight: 32,
   },
-  discussionContent: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 22,
-    marginBottom: 12,
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 4,
-  },
-  locationText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-    gap: 6,
-  },
-  tag: {
-    backgroundColor: '#e0e0e0',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  tagText: {
-    fontSize: 11,
-    color: '#666',
-  },
-  discussionFooter: {
+  
+  authorInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  authorInfo: {
-    flex: 1,
+  authorDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   authorName: {
-    fontSize: 12,
+    fontSize: 16,
     color: '#666',
-    fontStyle: 'italic',
-    marginBottom: 4,
-  },
-  discussionStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statText: {
-    fontSize: 11,
-    color: '#666',
-  },
-  statIcon: {
+    fontWeight: '600',
     marginLeft: 8,
   },
-  voteSection: {
+  date: {
+    fontSize: 14,
+    color: '#999',
+  },
+  
+  contentContainer: {
+    marginBottom: 20,
+  },
+  contentText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333',
+  },
+  
+  actionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    padding: 4,
+    backgroundColor: '#f8f9fa',
   },
-  voteButton: {
-    padding: 4,
-    borderRadius: 16,
+  actionButtonActive: {
+    backgroundColor: '#e3f2fd',
   },
-  voteButtonActive: {
-    backgroundColor: '#e0e0e0',
+  actionText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 4,
+    fontWeight: '500',
   },
-  voteScore: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginHorizontal: 12,
-    minWidth: 24,
-    textAlign: 'center',
+  actionTextActive: {
+    color: '#4c669f',
+    fontWeight: '600',
   },
+  
+  // Comments Section
   commentsSection: {
-    marginBottom: 100,
+    backgroundColor: '#fff',
+    margin: 20,
+    marginTop: 0,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   commentsTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
   },
-  commentContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+  addCommentContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginBottom: 20,
+    gap: 10,
   },
-  replyContainer: {
-    marginLeft: 20,
-    marginTop: 8,
-    backgroundColor: '#f0f4ff',
+  commentInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: '#333',
+    backgroundColor: '#f8f9fa',
+    minHeight: 40,
+    maxHeight: 100,
+  },
+  submitButton: {
+    backgroundColor: '#4c669f',
+    borderRadius: 20,
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 40,
+    height: 40,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  
+  // Comment Card
+  commentCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
   },
   commentHeader: {
     flexDirection: 'row',
@@ -745,158 +714,46 @@ const styles = StyleSheet.create({
   commentAuthor: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   commentAuthorName: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  commentTime: {
-    fontSize: 11,
     color: '#666',
+    fontWeight: '600',
+    marginLeft: 6,
   },
-  replyButton: {
-    padding: 4,
+  commentDate: {
+    fontSize: 12,
+    color: '#999',
   },
   commentContent: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#333',
     lineHeight: 20,
-    marginBottom: 8,
-  },
-  commentFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  commentVotes: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e0e0e0',
-    borderRadius: 16,
-    padding: 2,
-  },
-  repliesContainer: {
-    marginTop: 12,
-  },
-  commentInputContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  replyIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f0f4ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  replyText: {
-    fontSize: 12,
-    color: '#4c669f',
-    fontStyle: 'italic',
-  },
-  commentInput: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  commentTextInput: {
-    flex: 1,
-    fontSize: 14,
-    color: '#333',
-    maxHeight: 80,
-  },
-  sendButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  modalDescription: {
-    fontSize: 14,
-    color: '#666',
     marginBottom: 12,
   },
-  reportInput: {
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    minHeight: 80,
-    textAlignVertical: 'top',
-    marginBottom: 16,
-  },
-  modalButtons: {
+  commentActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
   },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 12,
-    borderRadius: 8,
+  commentVoteButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: '#fff',
   },
-  cancelButtonText: {
-    fontSize: 14,
+  commentVoteButtonActive: {
+    backgroundColor: '#e3f2fd',
+  },
+  commentVoteText: {
+    fontSize: 12,
     color: '#666',
-    fontWeight: '600',
+    marginLeft: 4,
+    fontWeight: '500',
   },
-  reportSubmitButton: {
-    flex: 1,
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  reportSubmitButtonText: {
-    fontSize: 14,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  commentVoteTextActive: {
+    color: '#4c669f',
     fontWeight: '600',
   },
 });

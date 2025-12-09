@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
+import { 
+  View, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Text, 
   ScrollView,
-  TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
-  RefreshControl,
-  Text
+  RefreshControl
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import { ThemedText } from '@/components/ThemedText';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { ThemedView } from '@/components/ThemedView';
+import { ThemedText } from '@/components/ThemedText';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -31,7 +32,8 @@ interface RecentItem {
   category: string;
 }
 
-export default function CommunityPulseDashboard({ navigation }: { navigation: any }) {
+export default function CommunityPulseDashboard() {
+  const navigation = useNavigation<any>();
   const [stats, setStats] = useState<CommunityStats>({
     totalDiscussions: 0,
     activePolls: 0,
@@ -68,6 +70,31 @@ export default function CommunityPulseDashboard({ navigation }: { navigation: an
     }
   };
 
+  const getTimeAgo = (dateString: string | undefined) => {
+    try {
+      if (!dateString) return 'Unknown';
+      
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date string:', dateString);
+        return 'Unknown';
+      }
+      
+      const now = new Date();
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+      
+      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+      return `${Math.floor(diffInMinutes / 1440)}d ago`;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Unknown';
+    }
+  };
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -78,20 +105,14 @@ export default function CommunityPulseDashboard({ navigation }: { navigation: an
         const discussionsResponse = await api.get('/discussions?limit=100');
         console.log('Discussions response:', discussionsResponse);
         
-        // Handle different response structures
-        if (Array.isArray(discussionsResponse)) {
-          discussionsData = discussionsResponse;
-        } else if (discussionsResponse && discussionsResponse.discussions && Array.isArray(discussionsResponse.discussions)) {
+        if (discussionsResponse && discussionsResponse.discussions && Array.isArray(discussionsResponse.discussions)) {
           discussionsData = discussionsResponse.discussions;
-        } else if (discussionsResponse && discussionsResponse.data) {
-          if (Array.isArray(discussionsResponse.data)) {
-            discussionsData = discussionsResponse.data;
-          } else if (discussionsResponse.data.discussions) {
-            discussionsData = discussionsResponse.data.discussions;
-          }
+        } else if (Array.isArray(discussionsResponse)) {
+          discussionsData = discussionsResponse;
         } else {
           discussionsData = [];
         }
+        console.log('Processed discussions data:', discussionsData.length, 'items');
       } catch (error) {
         console.error('Error fetching discussions:', error);
         discussionsData = [];
@@ -103,20 +124,14 @@ export default function CommunityPulseDashboard({ navigation }: { navigation: an
         const pollsResponse = await api.get('/polls?limit=100');
         console.log('Polls response:', pollsResponse);
         
-        // Handle different response structures
-        if (Array.isArray(pollsResponse)) {
-          pollsData = pollsResponse;
-        } else if (pollsResponse && pollsResponse.polls && Array.isArray(pollsResponse.polls)) {
+        if (pollsResponse && pollsResponse.polls && Array.isArray(pollsResponse.polls)) {
           pollsData = pollsResponse.polls;
-        } else if (pollsResponse && pollsResponse.data) {
-          if (Array.isArray(pollsResponse.data)) {
-            pollsData = pollsResponse.data;
-          } else if (pollsResponse.data.polls) {
-            pollsData = pollsResponse.data.polls;
-          }
+        } else if (Array.isArray(pollsResponse)) {
+          pollsData = pollsResponse;
         } else {
           pollsData = [];
         }
+        console.log('Processed polls data:', pollsData.length, 'items');
       } catch (error) {
         console.error('Error fetching polls:', error);
         pollsData = [];
@@ -126,49 +141,71 @@ export default function CommunityPulseDashboard({ navigation }: { navigation: an
 
       // Calculate user participation (discussions + poll votes)
       const userDiscussions = discussionsData.filter((d: any) => {
+        if (!d || !userId) return false;
         const authorId = d.authorId?._id || d.authorId;
         return authorId === userId;
       }).length;
       
       const userPolls = pollsData.filter((p: any) => {
+        if (!p || !userId) return false;
         const createdBy = p.createdBy?._id || p.createdBy;
         return createdBy === userId;
       }).length;
 
-      setStats({
+      const statsData = {
         totalDiscussions: discussionsData.length,
         activePolls,
         userParticipation: userDiscussions + userPolls,
         recentActivity: discussionsData.filter((d: any) => {
           try {
-            const createdAt = new Date(d.created_at);
+            if (!d) return false;
+            const dateStr = d.createdAt || d.created_at;
+            if (!dateStr) return false;
+            
+            const createdAt = new Date(dateStr);
+            if (isNaN(createdAt.getTime())) return false;
+            
             const dayAgo = new Date();
             dayAgo.setDate(dayAgo.getDate() - 1);
             return createdAt > dayAgo;
-          } catch {
+          } catch (error) {
+            console.warn('Error processing date for recent activity:', error);
             return false;
           }
         }).length
-      });
+      };
+      
+      console.log('Calculated stats:', statsData);
+      console.log('User ID for participation:', userId);
+      console.log('User discussions count:', userDiscussions);
+      console.log('User polls count:', userPolls);
+      
+      setStats(statsData);
 
       // Combine recent discussions and polls with safe access
-      const recentDiscussions = discussionsData.slice(0, 3).map((d: any) => ({
-        _id: d._id || '',
-        title: d.title || 'Untitled Discussion',
-        type: 'discussion' as const,
-        author: d.authorId?.fullName || d.authorId?.name || 'Anonymous',
-        timeAgo: getTimeAgo(d.created_at || new Date().toISOString()),
-        category: d.category || 'other'
-      }));
+      const recentDiscussions = discussionsData.slice(0, 3).map((d: any) => {
+        if (!d) return null;
+        return {
+          _id: d._id || '',
+          title: d.title || 'Untitled Discussion',
+          type: 'discussion' as const,
+          author: d.authorId?.fullName || d.authorId?.name || 'Anonymous',
+          timeAgo: getTimeAgo(d.createdAt || d.created_at),
+          category: d.category || 'other'
+        };
+      }).filter(Boolean);
 
-      const recentPolls = pollsData.slice(0, 2).map((p: any) => ({
-        _id: p._id || '',
-        title: p.title || 'Untitled Poll',
-        type: 'poll' as const,
-        author: p.createdBy?.fullName || p.createdBy?.name || 'Anonymous',
-        timeAgo: getTimeAgo(p.created_at || new Date().toISOString()),
-        category: p.category || 'other'
-      }));
+      const recentPolls = pollsData.slice(0, 2).map((p: any) => {
+        if (!p) return null;
+        return {
+          _id: p._id || '',
+          title: p.title || 'Untitled Poll',
+          type: 'poll' as const,
+          author: p.createdBy?.fullName || p.createdBy?.name || 'Anonymous',
+          timeAgo: getTimeAgo(p.createdAt || p.created_at),
+          category: p.category || 'other'
+        };
+      }).filter(Boolean);
 
       setRecentItems([...recentDiscussions, ...recentPolls]);
     } catch (error) {
@@ -187,27 +224,25 @@ export default function CommunityPulseDashboard({ navigation }: { navigation: an
     }
   };
 
-  const getTimeAgo = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
-      
-      if (diffInMinutes < 1) return 'Just now';
-      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-      return `${Math.floor(diffInMinutes / 1440)}d ago`;
-    } catch {
-      return 'Unknown';
-    }
-  };
-
-  // Add navigation safety checks
   const navigateToScreen = (screenName: string, params?: any) => {
-    if (navigation && navigation.navigate) {
-      navigation.navigate(screenName, params);
-    } else {
-      console.warn('Navigation not available');
+    console.log('Navigating to:', screenName, 'with params:', params);
+    
+    try {
+      if (screenName === 'DiscussionDetail' && params?.discussionId) {
+        console.log('Navigating to DiscussionDetail with ID:', params.discussionId);
+        navigation.navigate('DiscussionDetail', { id: params.discussionId });
+      } else if (screenName === 'PollDetail' && params?.pollId) {
+        console.log('Navigating to PollDetail with ID:', params.pollId);
+        navigation.navigate('PollDetail', { id: params.pollId });
+      } else if (screenName === 'DiscussionForum') {
+        navigation.navigate('DiscussionForum');
+      } else if (screenName === 'PollsSection') {
+        navigation.navigate('PollsSection');
+      } else {
+        console.warn('Unknown screen or missing params:', screenName, params);
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
     }
   };
 
@@ -239,7 +274,7 @@ export default function CommunityPulseDashboard({ navigation }: { navigation: an
           <ThemedText style={styles.subtitle}>Connect • Discuss • Decide</ThemedText>
         </View>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Reverted to small boxes layout */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <MaterialIcons name="forum" size={24} color="#4c669f" />
@@ -312,6 +347,7 @@ export default function CommunityPulseDashboard({ navigation }: { navigation: an
                 key={item._id}
                 style={styles.recentItem}
                 onPress={() => {
+                  console.log('Clicking item:', item);
                   if (item.type === 'discussion') {
                     navigateToScreen('DiscussionDetail', { discussionId: item._id });
                   } else {
@@ -345,17 +381,6 @@ export default function CommunityPulseDashboard({ navigation }: { navigation: an
             </View>
           )}
         </View>
-
-        {/* Community Guidelines */}
-        <View style={styles.guidelinesSection}>
-          <ThemedText style={styles.sectionTitle}>Community Guidelines</ThemedText>
-          <View style={styles.guidelineCard}>
-            <Text style={styles.guidelineItem}>• Be respectful and constructive</Text>
-            <Text style={styles.guidelineItem}>• Focus on community issues</Text>
-            <Text style={styles.guidelineItem}>• Provide evidence when possible</Text>
-            <Text style={styles.guidelineItem}>• Report inappropriate content</Text>
-          </View>
-        </View>
       </ScrollView>
     </LinearGradient>
   );
@@ -363,182 +388,74 @@ export default function CommunityPulseDashboard({ navigation }: { navigation: an
 
 const getCategoryColor = (category: string) => {
   const colors: { [key: string]: string } = {
-    infrastructure: '#FF6B6B',
-    safety: '#4ECDC4',
-    environment: '#45B7D1',
-    community: '#96CEB4',
-    government: '#FFEAA7',
-    other: '#DDA0DD'
+    infrastructure: '#ff6b6b',
+    safety: '#4ecdc4',
+    environment: '#45b7d1',
+    community: '#96ceb4',
+    government: '#feca57',
+    other: '#a0a0a0'
   };
   return colors[category] || colors.other;
 };
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
-  container: { 
-    flex: 1,
-    paddingTop: 50,
-    paddingHorizontal: 20,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 8,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  statsContainer: {
-    flexDirection: 'row',
+  container: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 16, fontSize: 16, color: '#4c669f' },
+  header: { paddingTop: 60, paddingHorizontal: 20, alignItems: 'center', marginBottom: 30 },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 8 },
+  subtitle: { fontSize: 16, color: 'rgba(255,255,255,0.8)' },
+  
+  // Stats Container - Grid Layout
+  statsContainer: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
     justifyContent: 'space-between',
-    marginBottom: 30,
-    flexWrap: 'wrap',
+    paddingHorizontal: 20, 
+    marginBottom: 30 
   },
-  statCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 15,
-    padding: 16,
+  statCard: { 
+    backgroundColor: 'rgba(255,255,255,0.9)', 
+    borderRadius: 12, 
+    padding: 16, 
+    width: '48%',
+    marginBottom: 12,
     alignItems: 'center',
-    width: '22%',
-    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
   },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  actionsContainer: {
-    gap: 16,
-    marginBottom: 30,
-  },
-  actionCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  actionGradient: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  actionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 8,
-  },
-  actionSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 4,
-  },
-  recentSection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  viewAllText: {
-    fontSize: 14,
-    color: '#4c669f',
-    fontWeight: '600',
-  },
+  statNumber: { fontSize: 24, fontWeight: 'bold', marginTop: 8, color: '#333' },
+  statLabel: { fontSize: 12, color: '#666', marginTop: 4, textAlign: 'center' },
+  
+  actionsContainer: { paddingHorizontal: 20, marginBottom: 30 },
+  actionCard: { marginBottom: 16, borderRadius: 16, overflow: 'hidden' },
+  actionGradient: { padding: 20, flexDirection: 'row', alignItems: 'center' },
+  actionTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginLeft: 16, flex: 1 },
+  actionSubtitle: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginLeft: 16, marginTop: 4, flex: 1 },
+  
+  recentSection: { paddingHorizontal: 20, marginBottom: 40 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff' },
+  viewAllText: { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
   recentItem: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    alignItems: 'center'
   },
-  recentItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  recentItemText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  recentItemTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  recentItemMeta: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  categoryTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  categoryText: {
-    fontSize: 10,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  guidelinesSection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 30,
-  },
-  guidelineCard: {
-    marginTop: 10,
-  },
-  guidelineItem: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 16,
-    fontWeight: '500',
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 4,
-  },
+  recentItemContent: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  recentItemText: { marginLeft: 12, flex: 1 },
+  recentItemTitle: { fontSize: 16, fontWeight: '600', color: '#333' },
+  recentItemMeta: { fontSize: 12, color: '#666', marginTop: 4 },
+  categoryTag: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  categoryText: { fontSize: 10, color: '#fff', fontWeight: '600' },
+  emptyState: { alignItems: 'center', paddingVertical: 40 },
+  emptyStateText: { fontSize: 16, color: 'rgba(255,255,255,0.8)', marginTop: 16 },
+  emptyStateSubtext: { fontSize: 14, color: 'rgba(255,255,255,0.6)', marginTop: 8 }
 });

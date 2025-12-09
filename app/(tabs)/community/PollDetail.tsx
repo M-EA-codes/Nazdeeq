@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
+import { 
+  View, 
+  Text, 
+  ScrollView, 
+  StyleSheet, 
+  ActivityIndicator, 
   Alert,
-  RefreshControl,
-  Modal,
-  Text,
+  TouchableOpacity 
 } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ThemedText } from '@/components/ThemedText';
@@ -25,184 +25,241 @@ interface Poll {
   _id: string;
   title: string;
   question: string;
-  options: PollOption[];
+  category: string;
   createdBy: {
     _id: string;
     fullName: string;
     profilePhoto?: string;
   };
-  category: string;
-  isActive: boolean;
-  endDate?: string;
-  allowMultipleVotes: boolean;
-  isAnonymous: boolean;
+  createdAt?: string;
+  created_at?: string;
+  options: PollOption[];
   totalVotes: number;
-  created_at: string;
-  location: string;
+  isActive: boolean;
+  endDate?: string | null;
 }
 
-export default function PollDetail({ route, navigation }: { route: any, navigation: any }) {
-  const { pollId } = route.params;
+export default function PollDetail() {
+  const navigation = useNavigation<any>();
+  const route = useRoute();
+  const params = route.params as { id: string };
   const [poll, setPoll] = useState<Poll | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [selectedOptions, setSelectedOptions] = useState<number[]>([]);
-  const [showVoters, setShowVoters] = useState(false);
-  const [selectedOptionVoters, setSelectedOptionVoters] = useState<any[]>([]);
+  const [voting, setVoting] = useState(false);
+
+  // Get the ID from params
+  const pollId = params?.id;
 
   useEffect(() => {
     fetchUserData();
   }, []);
 
   useEffect(() => {
-    if (userId) {
-      fetchPoll();
+    console.log('userId or poll changed:', { userId, poll: !!poll });
+    if (userId && poll) {
+      console.log('Checking if user is creator...');
+      isUserCreator();
     }
-  }, [userId, pollId]);
+  }, [userId, poll]);
+
+  useEffect(() => {
+    console.log('PollDetail mounted');
+    console.log('All params:', params);
+    console.log('Poll ID from params:', pollId);
+    
+    if (pollId) {
+      fetchPoll(pollId);
+    } else {
+      console.error('No poll ID provided in params');
+      Alert.alert(
+        'Error', 
+        'No poll ID provided',
+        [{ text: 'Go Back', onPress: () => navigation.goBack() }]
+      );
+    }
+  }, [pollId]);
 
   const fetchUserData = async () => {
     try {
       const storedUserId = await AsyncStorage.getItem('userId');
       const prefs = await AsyncStorage.getItem('userPreferences');
+      console.log('Fetching user data:', { storedUserId, prefs });
+      
       if (storedUserId) {
+        console.log('Setting userId from storedUserId:', storedUserId);
         setUserId(storedUserId);
       } else if (prefs) {
         const parsed = JSON.parse(prefs);
+        console.log('Setting userId from prefs:', parsed.userId);
         setUserId(parsed.userId);
+      } else {
+        console.log('No userId found in storage');
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
     }
   };
 
-  const fetchPoll = async () => {
+  const fetchPoll = async (id: string) => {
     try {
-      const response = await api.get(`/polls/${pollId}`);
-      setPoll(response.data);
+      setLoading(true);
+      console.log('Fetching poll with ID:', id);
       
-      // Set selected options if user has voted
-      if (response.data.options) {
-        const userVotes = response.data.options
-          .filter((option: PollOption) => option.votes.includes(userId || ''))
-          .map((option: PollOption) => option.optionId);
-        setSelectedOptions(userVotes);
+      const response = await api.get(`/polls/${id}`);
+      console.log('Poll response:', response);
+      console.log('Poll createdAt:', response?.createdAt);
+      console.log('Poll created_at:', response?.created_at);
+      console.log('Poll endDate:', response?.endDate);
+      console.log('Poll createdBy:', response?.createdBy);
+      console.log('Poll isActive:', response?.isActive);
+      
+      if (response) {
+        setPoll(response);
+      } else {
+        throw new Error('No poll data received');
       }
     } catch (error) {
       console.error('Error fetching poll:', error);
+      Alert.alert(
+        'Poll Not Found',
+        'The poll you are looking for could not be found.',
+        [
+          { text: 'Go Back', onPress: () => navigation.goBack() }
+        ]
+      );
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  const handleVote = async () => {
-    if (!poll || selectedOptions.length === 0) return;
+  const handleVote = async (optionId: number) => {
+    if (!userId || !pollId || voting || !poll?.isActive) return;
     
     try {
-      // For multiple votes, vote on each selected option
-      for (const optionId of selectedOptions) {
-        await api.post(`/polls/${pollId}/vote`, {
-          userId,
-          optionId
-        });
-      }
-      
-      fetchPoll();
-      Alert.alert('Success', 'Your vote has been recorded!');
-    } catch (error) {
-      console.error('Error voting:', error);
-      Alert.alert('Error', 'Failed to record vote. Please try again.');
-    }
-  };
-
-  const handleOptionSelect = (optionId: number) => {
-    if (!poll || hasUserVoted()) return;
-    
-    if (poll.allowMultipleVotes) {
-      setSelectedOptions(prev => 
-        prev.includes(optionId) 
-          ? prev.filter(id => id !== optionId)
-          : [...prev, optionId]
-      );
-    } else {
-      setSelectedOptions([optionId]);
-    }
-  };
-
-  const showOptionVoters = async (option: PollOption) => {
-    if (poll?.isAnonymous) {
-      Alert.alert('Anonymous Poll', 'Voter details are hidden for this poll');
-      return;
-    }
-    
-    try {
-      const voterPromises = option.votes.map(async (voterId) => {
-        const response = await api.get(`/users/${voterId}`);
-        return response.data;
+      setVoting(true);
+      await api.post(`/polls/${pollId}/vote`, {
+        userId,
+        optionId
       });
       
-      const voters = await Promise.all(voterPromises);
-      setSelectedOptionVoters(voters);
-      setShowVoters(true);
+      // Refresh poll data
+      await fetchPoll(pollId);
     } catch (error) {
-      console.error('Error fetching voters:', error);
+      console.error('Error voting:', error);
+      Alert.alert('Error', 'Failed to vote. Please try again.');
+    } finally {
+      setVoting(false);
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchPoll();
+  const hasUserVoted = () => {
+    if (!userId || !poll) return false;
+    return poll.options.some(option => option.votes.includes(userId));
   };
 
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
-    
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  const getUserVoteOption = () => {
+    if (!userId || !poll) return null;
+    return poll.options.find(option => option.votes.includes(userId));
   };
 
-  const getTimeRemaining = (endDate: string) => {
-    const end = new Date(endDate);
-    const now = new Date();
-    const diffInMinutes = Math.floor((end.getTime() - now.getTime()) / 60000);
+  const isUserCreator = () => {
+    if (!userId || !poll) {
+      console.log('isUserCreator: Missing userId or poll', { userId, poll: !!poll });
+      return false;
+    }
+    const creatorId = poll.createdBy._id || poll.createdBy;
+    const isCreator = creatorId === userId;
+    console.log('isUserCreator check:', {
+      userId,
+      creatorId,
+      isCreator,
+      pollCreatedBy: poll.createdBy
+    });
+    return isCreator;
+  };
+
+  const endPoll = async () => {
+    if (!userId || !poll || !isUserCreator()) return;
     
-    if (diffInMinutes < 0) return 'Ended';
-    if (diffInMinutes < 60) return `${diffInMinutes}m left`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h left`;
-    return `${Math.floor(diffInMinutes / 1440)}d left`;
+    Alert.alert(
+      'End Poll',
+      'Are you sure you want to end this poll? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'End Poll', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setVoting(true);
+              await api.post(`/polls/${poll._id}/end`, { userId });
+              
+              // Refresh poll data
+              await fetchPoll(poll._id);
+              
+              Alert.alert('Success', 'Poll ended successfully');
+            } catch (error) {
+              console.error('Error ending poll:', error);
+              Alert.alert('Error', 'Failed to end poll. Please try again.');
+            } finally {
+              setVoting(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const formatDate = (dateString: string | undefined) => {
+    try {
+      if (!dateString) return 'Unknown date';
+      
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date string:', dateString);
+        return 'Unknown date';
+      }
+      
+      const now = new Date();
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+      
+      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+      if (diffInMinutes < 10080) return `${Math.floor(diffInMinutes / 1440)}d ago`;
+      
+      // For older dates, show compact formatted date
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Unknown date';
+    }
   };
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
-      infrastructure: '#FF6B6B',
-      safety: '#4ECDC4',
-      environment: '#45B7D1',
-      community: '#96CEB4',
-      government: '#FFEAA7',
-      other: '#DDA0DD'
+      infrastructure: '#ff6b6b',
+      safety: '#4ecdc4',
+      environment: '#45b7d1',
+      community: '#96ceb4',
+      government: '#feca57',
+      other: '#a0a0a0'
     };
     return colors[category] || colors.other;
-  };
-
-  const hasUserVoted = () => {
-    if (!poll || !userId) return false;
-    return poll.options.some(option => option.votes.includes(userId));
-  };
-
-  const getVotePercentage = (option: PollOption) => {
-    if (poll?.totalVotes === 0) return 0;
-    return Math.round((option.votes.length / poll!.totalVotes) * 100);
   };
 
   if (loading) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
-        <View style={styles.loadingContainer}>
+        <View style={[styles.container, styles.centered]}>
+          <ActivityIndicator size="large" color="#fff" />
           <ThemedText style={styles.loadingText}>Loading poll...</ThemedText>
         </View>
       </LinearGradient>
@@ -212,16 +269,19 @@ export default function PollDetail({ route, navigation }: { route: any, navigati
   if (!poll) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
-        <View style={styles.errorContainer}>
+        <View style={[styles.container, styles.centered]}>
+          <MaterialIcons name="error" size={64} color="#fff" />
           <ThemedText style={styles.errorText}>Poll not found</ThemedText>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
     );
   }
-
-  const isExpired = poll.endDate && new Date(poll.endDate) < new Date();
-  const userHasVoted = hasUserVoted();
-  const canVote = poll.isActive && !isExpired && !userHasVoted;
 
   return (
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.gradient}>
@@ -230,216 +290,134 @@ export default function PollDetail({ route, navigation }: { route: any, navigati
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={styles.backButton}
+            style={styles.backIcon}
           >
             <MaterialIcons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <ThemedText style={styles.title}>Poll Details</ThemedText>
-          <TouchableOpacity
-            onPress={() => {/* Share functionality */}}
-            style={styles.shareButton}
-          >
-            <MaterialIcons name="share" size={20} color="#fff" />
-          </TouchableOpacity>
+          <ThemedText style={styles.headerTitle}>Poll</ThemedText>
+          <View style={{ width: 24 }} />
         </View>
 
-        <ScrollView 
-          style={styles.content}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Poll Header */}
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.pollCard}>
-            <View style={styles.pollHeader}>
-              <View style={styles.pollMeta}>
-                <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(poll.category) }]}>
-                  <Text style={styles.categoryText}>{poll.category}</Text>
-                </View>
-                {!poll.isActive && (
-                  <View style={styles.endedBadge}>
-                    <Text style={styles.endedText}>Ended</Text>
-                  </View>
-                )}
-                {poll.isAnonymous && (
-                  <MaterialIcons name="visibility-off" size={16} color="#666" style={styles.anonymousIcon} />
-                )}
+            {/* Category and Status */}
+            <View style={styles.topRow}>
+              <View style={[styles.categoryTag, { backgroundColor: getCategoryColor(poll.category) }]}>
+                <Text style={styles.categoryText}>{poll.category.toUpperCase()}</Text>
               </View>
-              <ThemedText style={styles.timeAgo}>{getTimeAgo(poll.created_at)}</ThemedText>
-            </View>
-
-            <ThemedText style={styles.pollTitle}>{poll.title}</ThemedText>
-            <ThemedText style={styles.pollQuestion}>{poll.question}</ThemedText>
-
-            {/* Poll Stats */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <MaterialIcons name="how-to-vote" size={16} color="#666" />
-                <ThemedText style={styles.statText}>{poll.totalVotes} votes</ThemedText>
-              </View>
-              
-              {poll.endDate && (
-                <View style={styles.statItem}>
-                  <MaterialIcons name="schedule" size={16} color="#666" />
-                  <ThemedText style={[
-                    styles.statText,
-                    isExpired && styles.expiredText
-                  ]}>
-                    {getTimeRemaining(poll.endDate)}
-                  </ThemedText>
-                </View>
-              )}
-
-              <View style={styles.statItem}>
-                <MaterialIcons name="person" size={16} color="#666" />
-                <ThemedText style={styles.statText}>by {poll.createdBy.fullName}</ThemedText>
+              <View style={[styles.statusTag, { backgroundColor: poll.isActive ? '#4caf50' : '#ff9800' }]}>
+                <Text style={styles.statusText}>{poll.isActive ? 'ACTIVE' : 'INACTIVE'}</Text>
               </View>
             </View>
-
-            {poll.location && (
-              <View style={styles.locationContainer}>
-                <MaterialIcons name="location-on" size={16} color="#666" />
-                <ThemedText style={styles.locationText}>{poll.location}</ThemedText>
-              </View>
-            )}
-          </View>
-
-          {/* Poll Options */}
-          <View style={styles.optionsContainer}>
-            <ThemedText style={styles.optionsTitle}>Options</ThemedText>
             
-            {poll.options.map((option) => {
-              const percentage = getVotePercentage(option);
-              const isSelected = selectedOptions.includes(option.optionId);
-              const isUserChoice = userHasVoted && option.votes.includes(userId || '');
-
-              return (
-                <TouchableOpacity
-                  key={option.optionId}
-                  style={[
-                    styles.optionCard,
-                    canVote && isSelected && styles.optionSelected,
-                    isUserChoice && styles.optionUserChoice
-                  ]}
-                  onPress={() => {
-                    if (canVote) {
-                      handleOptionSelect(option.optionId);
-                    } else if (userHasVoted || isExpired) {
-                      showOptionVoters(option);
+            {/* Title and Question */}
+            <Text style={styles.title}>{poll.title}</Text>
+            <Text style={styles.question}>{poll.question}</Text>
+            
+            {/* Author Info */}
+            <View style={styles.authorInfo}>
+              <View style={styles.authorDetails}>
+                <MaterialIcons name="person" size={20} color="#666" />
+                <Text style={styles.authorName}>{poll.createdBy.fullName}</Text>
+              </View>
+              <Text 
+                style={styles.date}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
+                {formatDate(poll.createdAt || poll.created_at)}
+              </Text>
+            </View>
+            
+            {/* Poll Options */}
+            <View style={styles.optionsContainer}>
+              <View style={styles.optionsHeader}>
+                <Text style={styles.optionsTitle}>
+                  {hasUserVoted() ? `Results (${poll.totalVotes} total votes)` : 'Vote on this poll'}
+                </Text>
+                {(() => {
+                  const isCreator = isUserCreator();
+                  const isActive = poll.isActive;
+                  console.log('End Poll button conditions:', {
+                    isCreator,
+                    isActive,
+                    shouldShow: isCreator && isActive
+                  });
+                  return isCreator && isActive;
+                })() && (
+                  <TouchableOpacity
+                    style={styles.endPollButton}
+                    onPress={endPoll}
+                    disabled={voting}
+                  >
+                    <MaterialIcons name="stop" size={16} color="#fff" />
+                    <Text style={styles.endPollButtonText}>End Poll</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {poll.options.map((option) => {
+                const percentage = poll.totalVotes > 0 ? (option.votes.length / poll.totalVotes) * 100 : 0;
+                const userVoted = hasUserVoted();
+                const userVoteOption = getUserVoteOption();
+                const isUserChoice = userVoteOption?.optionId === option.optionId;
+                const isExpired = (() => {
+                  if (!poll.endDate) return false;
+                  try {
+                    const endDate = new Date(poll.endDate);
+                    if (isNaN(endDate.getTime())) {
+                      console.warn('Invalid endDate:', poll.endDate);
+                      return false;
                     }
-                  }}
-                  disabled={!canVote && !userHasVoted && !isExpired}
-                >
-                  {(userHasVoted || isExpired) && (
-                    <View 
-                      style={[styles.optionProgress, { width: `${percentage}%` }]} 
-                    />
-                  )}
-                  
-                  <View style={styles.optionContent}>
-                    <View style={styles.optionLeft}>
-                      {canVote && (
-                        <View style={styles.radioContainer}>
-                          <View style={[
-                            styles.radio,
-                            isSelected && styles.radioSelected
-                          ]} />
-                        </View>
-                      )}
-                      <ThemedText style={[
-                        styles.optionText,
-                        isUserChoice && styles.optionTextHighlight
-                      ]}>
-                        {option.text}
-                      </ThemedText>
-                    </View>
+                    return endDate < new Date();
+                  } catch (error) {
+                    console.error('Error checking endDate:', error);
+                    return false;
+                  }
+                })();
+                
+                return (
+                  <TouchableOpacity
+                    key={option.optionId}
+                    style={[
+                      styles.option,
+                      isUserChoice && styles.optionUserChoice,
+                      !userVoted && !isExpired && poll.isActive && styles.optionVotable
+                    ]}
+                    onPress={() => {
+                      if (!userVoted && !isExpired && poll.isActive) {
+                        handleVote(option.optionId);
+                      }
+                    }}
+                    disabled={userVoted || isExpired || !poll.isActive || voting}
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      isUserChoice && styles.optionTextHighlight
+                    ]}>
+                      {option.text}
+                    </Text>
                     
-                    {(userHasVoted || isExpired) && (
-                      <View style={styles.optionResults}>
-                        <ThemedText style={styles.optionPercentage}>{percentage}%</ThemedText>
-                        <ThemedText style={styles.optionVotes}>
-                          {option.votes.length} vote{option.votes.length !== 1 ? 's' : ''}
-                        </ThemedText>
+                    {(userVoted || isExpired) && (
+                    <View style={styles.progressContainer}>
+                      <View style={styles.progressBar}>
+                        <View style={[styles.progressFill, { width: `${percentage}%` }]} />
                       </View>
+                      <Text style={styles.percentageText}>{percentage.toFixed(1)}%</Text>
+                    </View>
                     )}
                     
-                    {isUserChoice && (
-                      <MaterialIcons name="check" size={20} color="#4ECDC4" />
-                    )}
+                    <View style={styles.optionFooter}>
+                    <Text style={styles.voteCount}>{option.votes.length} votes</Text>
+                      {isUserChoice && (
+                        <MaterialIcons name="check-circle" size={20} color="#4caf50" />
+                      )}
                   </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Vote Button */}
-          {canVote && selectedOptions.length > 0 && (
-            <TouchableOpacity
-              style={styles.voteButton}
-              onPress={handleVote}
-            >
-              <ThemedText style={styles.voteButtonText}>
-                Cast Vote{selectedOptions.length > 1 ? 's' : ''}
-              </ThemedText>
-            </TouchableOpacity>
-          )}
-
-          {/* Poll Settings Info */}
-          <View style={styles.infoContainer}>
-            <ThemedText style={styles.infoTitle}>Poll Settings</ThemedText>
-            
-            <View style={styles.infoItem}>
-              <MaterialIcons 
-                name={poll.allowMultipleVotes ? "check-box" : "check-box-outline-blank"} 
-                size={16} 
-                color={poll.allowMultipleVotes ? "#4ECDC4" : "#666"} 
-              />
-              <ThemedText style={styles.infoText}>Multiple votes allowed</ThemedText>
-            </View>
-            
-            <View style={styles.infoItem}>
-              <MaterialIcons 
-                name={poll.isAnonymous ? "visibility-off" : "visibility"} 
-                size={16} 
-                color={poll.isAnonymous ? "#FF6B6B" : "#666"} 
-              />
-              <ThemedText style={styles.infoText}>
-                {poll.isAnonymous ? 'Anonymous voting' : 'Public voting'}
-              </ThemedText>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         </ScrollView>
-
-        {/* Voters Modal */}
-        <Modal
-          visible={showVoters}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowVoters(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <ThemedText style={styles.modalTitle}>Voters ({selectedOptionVoters.length})</ThemedText>
-                <TouchableOpacity onPress={() => setShowVoters(false)}>
-                  <MaterialIcons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView style={styles.votersContainer}>
-                {selectedOptionVoters.map((voter, index) => (
-                  <View key={index} style={styles.voterItem}>
-                    <View style={styles.voterAvatar}>
-                      <ThemedText style={styles.voterInitial}>
-                        {voter.fullName?.charAt(0) || 'U'}
-                      </ThemedText>
-                    </View>
-                    <ThemedText style={styles.voterName}>{voter.fullName || 'Unknown User'}</ThemedText>
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
       </View>
     </LinearGradient>
   );
@@ -447,311 +425,221 @@ export default function PollDetail({ route, navigation }: { route: any, navigati
 
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
-  container: { 
-    flex: 1,
-    paddingTop: 50,
-  },
+  container: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
   },
-  backButton: {
+  backIcon: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  title: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
   },
-  shareButton: {
-    padding: 8,
-  },
-  content: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  
   loadingText: {
-    color: '#fff',
+    marginTop: 16,
     fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    color: '#fff',
   },
   errorText: {
+    fontSize: 18,
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  backButton: {
+    marginTop: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  backButtonText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '600',
   },
+  
+  scrollView: { flex: 1 },
   pollCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  pollHeader: {
+  
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  pollMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  categoryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  categoryTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   categoryText: {
-    fontSize: 11,
-    color: '#fff',
-    fontWeight: 'bold',
-    textTransform: 'capitalize',
-  },
-  endedBadge: {
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  endedText: {
-    fontSize: 11,
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  anonymousIcon: {
-    marginLeft: 4,
-  },
-  timeAgo: {
     fontSize: 12,
-    color: '#666',
+    color: '#fff',
+    fontWeight: 'bold',
   },
-  pollTitle: {
-    fontSize: 18,
+  statusTag: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  
+  title: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
-  },
-  pollQuestion: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
     marginBottom: 12,
+    lineHeight: 32,
   },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  expiredText: {
-    color: '#FF6B6B',
-    fontWeight: '600',
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-  },
-  locationText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  optionsContainer: {
-    marginBottom: 20,
-  },
-  optionsTitle: {
+  question: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
+    color: '#666',
+    marginBottom: 20,
+    lineHeight: 22,
   },
-  optionCard: {
-    borderRadius: 8,
-    marginBottom: 12,
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  optionSelected: {
-    borderColor: '#4c669f',
-    borderWidth: 2,
-  },
-  optionUserChoice: {
-    borderColor: '#4ECDC4',
-    borderWidth: 2,
-  },
-  optionProgress: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(76, 102, 159, 0.1)',
-  },
-  optionContent: {
+  
+  authorInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    position: 'relative',
-    zIndex: 1,
+    marginBottom: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  optionLeft: {
+  authorDetails: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  radioContainer: {
     marginRight: 12,
   },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#ccc',
-    backgroundColor: '#fff',
-  },
-  radioSelected: {
-    borderColor: '#4c669f',
-    backgroundColor: '#4c669f',
-  },
-  optionText: {
-    fontSize: 14,
-    color: '#333',
-    flex: 1,
-  },
-  optionTextHighlight: {
+  authorName: {
+    fontSize: 16,
+    color: '#666',
     fontWeight: '600',
-    color: '#4ECDC4',
-  },
-  optionResults: {
-    alignItems: 'flex-end',
-    marginLeft: 12,
-  },
-  optionPercentage: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4c669f',
-  },
-  optionVotes: {
-    fontSize: 11,
-    color: '#666',
-  },
-  voteButton: {
-    backgroundColor: '#4c669f',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  voteButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  infoContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 30,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  modalOverlay: {
+    marginLeft: 8,
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxWidth: 400,
-    maxHeight: '70%',
+  date: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'right',
+    flexShrink: 1,
+    maxWidth: '40%',
   },
-  modalHeader: {
+  
+  optionsContainer: {
+    marginTop: 8,
+  },
+  optionsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
-  modalTitle: {
+  optionsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
   },
-  votersContainer: {
-    maxHeight: 300,
-  },
-  voterItem: {
+  endPollButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#ff4444',
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    gap: 12,
+    borderRadius: 20,
   },
-  voterAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#4c669f',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  voterInitial: {
+  endPollButtonText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
-  voterName: {
-    fontSize: 14,
+  option: {
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  optionVotable: {
+    backgroundColor: '#fff',
+    borderColor: '#e0e0e0',
+  },
+  optionUserChoice: {
+    borderColor: '#4caf50',
+    backgroundColor: '#e8f5e8',
+  },
+  optionText: {
+    fontSize: 16,
     color: '#333',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  optionTextHighlight: {
+    color: '#4caf50',
+    fontWeight: '600',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  progressBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#eee',
+    borderRadius: 4,
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4c669f',
+    borderRadius: 4,
+  },
+  percentageText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '600',
+    minWidth: 45,
+  },
+  voteCount: {
+    fontSize: 12,
+    color: '#999',
+  },
+  optionFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
   },
 });

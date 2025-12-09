@@ -1,0 +1,134 @@
+[
+  {
+    "groupId": "68e3943ded454176fe5ea5a1",
+    "name": "Eid ul Fitr Community Celebration",
+    "description": "Join us for a grand Eid celebration with traditional food, games, and activities for the whole family. Bring your loved ones!",
+    "dateTime": "2025-04-01T16:00:00.000Z",
+    "location": {
+      "address": "Blue Area Community Center, Islamabad",
+      "coordinates": [33.7077, 73.0563]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d16", "684dd7aa8a91249f11a20d17", "684dd7aa8a91249f11a20d18"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5a2",
+    "name": "Weekend Cricket Tournament",
+    "description": "Neighborhood cricket tournament for all skill levels. Teams will be formed on the spot. Refreshments provided.",
+    "dateTime": "2025-01-25T08:00:00.000Z",
+    "location": {
+      "address": "F-8 Sports Complex, Islamabad",
+      "coordinates": [33.6973, 73.0515]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d19", "684dd7aa8a91249f11a20d20"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5a3",
+    "name": "Book Club Monthly Meeting",
+    "description": "This month we're discussing 'The Kite Runner'. Come prepared with your thoughts and enjoy tea and snacks with fellow book lovers.",
+    "dateTime": "2025-01-28T18:30:00.000Z",
+    "location": {
+      "address": "Centaurus Mall Food Court, Islamabad",
+      "coordinates": [33.7215, 73.0433]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d21", "684dd7aa8a91249f11a20d22", "684dd7aa8a91249f11a20d23", "684dd7aa8a91249f11a20d24"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5a4",
+    "name": "Community Garden Workshop",
+    "description": "Learn organic gardening techniques and help plant vegetables for our community garden. Tools and seeds provided.",
+    "dateTime": "2025-02-02T09:00:00.000Z",
+    "location": {
+      "address": "Saidpur Village Community Garden, Islamabad",
+      "coordinates": [33.7324, 72.8206]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d25", "684dd7aa8a91249f11a20d26"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5a5",
+    "name": "Cooking Class: Pakistani Cuisine",
+    "description": "Master chef will teach traditional Pakistani dishes including biryani, karahi, and naan. All ingredients included.",
+    "dateTime": "2025-02-05T15:00:00.000Z",
+    "location": {
+      "address": "Committee Chowk Community Hall, Rawalpindi",
+      "coordinates": [33.5651, 73.0169]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d27", "684dd7aa8a91249f11a20d28", "684dd7aa8a91249f11a20d29"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5a6",
+    "name": "Kids Art & Craft Workshop",
+    "description": "Fun art activities for children aged 5-12. Parents welcome to join. All art supplies provided. Let creativity flow!",
+    "dateTime": "2025-02-08T14:00:00.000Z",
+    "location": {
+      "address": "Quaid-e-Azam University Arts Building",
+      "coordinates": [33.6518, 73.1597]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d30", "684dd7aa8a91249f11a20d31"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5a7",
+    "name": "Evening Fitness Bootcamp",
+    "description": "High-energy outdoor fitness session suitable for all fitness levels. Bring water bottle and exercise mat.",
+    "dateTime": "2025-02-10T17:30:00.000Z",
+    "location": {
+      "address": "Pakistan Institute of Medical Sciences Ground",
+      "coordinates": [33.7215, 73.0433]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d32", "684dd7aa8a91249f11a20d33", "684dd7aa8a91249f11a20d34"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5a8",
+    "name": "Tech Meetup: AI & Machine Learning",
+    "description": "Discussion on latest AI trends and hands-on ML workshop. Bring your laptops. Suitable for beginners and experts.",
+    "dateTime": "2025-02-12T19:00:00.000Z",
+    "location": {
+      "address": "Islamabad Airport Business Lounge",
+      "coordinates": [33.6149, 72.9906]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d35"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5a9",
+    "name": "Photography Walk: Old Islamabad",
+    "description": "Explore and capture the beauty of old Islamabad architecture. All camera types welcome. Tips and tricks sharing session.",
+    "dateTime": "2025-02-15T07:00:00.000Z",
+    "location": {
+      "address": "Saddar Bazaar, Rawalpindi",
+      "coordinates": [33.5651, 73.0169]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d36", "684dd7aa8a91249f11a20d37", "684dd7aa8a91249f11a20d38"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5b0",
+    "name": "Movie Night: Pakistani Cinema",
+    "description": "Outdoor screening of classic Pakistani films under the stars. Popcorn and chai provided. Bring your own chairs.",
+    "dateTime": "2025-02-18T20:00:00.000Z",
+    "location": {
+      "address": "Benazir Bhutto Hospital Lawn, Rawalpindi",
+      "coordinates": [33.5651, 73.0169]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d39", "684dd7aa8a91249f11a20d40"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5b1",
+    "name": "Charity Drive: Winter Clothes Collection",
+    "description": "Community initiative to collect warm clothes for underprivileged families. Drop-off point and sorting volunteers needed.",
+    "dateTime": "2025-02-20T10:00:00.000Z",
+    "location": {
+      "address": "Blue Area Masjid, Islamabad",
+      "coordinates": [33.7077, 73.0563]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d41", "684dd7aa8a91249f11a20d42", "684dd7aa8a91249f11a20d43"]
+  },
+  {
+    "groupId": "68e3943ded454176fe5ea5b2",
+    "name": "Language Exchange Cafe",
+    "description": "Practice English, Urdu, and other languages with native speakers. Casual conversation over coffee and snacks.",
+    "dateTime": "2025-02-22T16:00:00.000Z",
+    "location": {
+      "address": "F-8 Markaz Coffee Shop, Islamabad",
+      "coordinates": [33.6973, 73.0515]
+    },
+    "attendeeIds": ["684dd7aa8a91249f11a20d44"]
+  }
+]
