@@ -46,6 +46,37 @@ const UserSchema = new Schema({
     default: '',
     maxlength: 200
   },
+  location: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point'
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      default: [73.0479, 33.6844] // Default to Islamabad coordinates
+    },
+    address: {
+      type: String,
+      default: ''
+    }
+  },
+  onboardingPreferences: {
+    interests: {
+      neighborCommute: { type: Boolean, default: false },
+      neighborworks: { type: Boolean, default: false },
+      vibeTribe: { type: Boolean, default: false },
+      communityPulse: { type: Boolean, default: false },
+      impactFund: { type: Boolean, default: false }
+    },
+    contributions: {
+      offerRide: { type: Boolean, default: false },
+      volunteering: { type: Boolean, default: false },
+      organizingMeetups: { type: Boolean, default: false },
+      participating: { type: Boolean, default: false }
+    },
+    connectNearby: { type: Boolean, default: true }
+  },
   profilePhoto: { 
     type: String, 
     default: '' 
@@ -104,5 +135,7 @@ UserSchema.pre('save', function(next) {
 // Add indexes for better performance
 UserSchema.index({ email: 1 });
 UserSchema.index({ phoneNumber: 1 });
+// Add geospatial index for location-based queries
+UserSchema.index({ 'location': '2dsphere' });
 
 module.exports = mongoose.model('User', UserSchema);
