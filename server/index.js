@@ -20,6 +20,8 @@ const pollRoutes = require('./routes/polls');
 const eventRoutes = require('./routes/events');
 const groupRoutes = require('./routes/groups');
 const commentRoutes = require('./routes/comments');
+const homeDashboardRoutes = require('./routes/homeDashboard');
+const communityRoutes = require('./routes/community');
 
 // Middleware
 const app = express();
@@ -205,6 +207,8 @@ app.use('/api/polls', pollRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/home-dashboard', homeDashboardRoutes);
+app.use('/api', communityRoutes);
 // Environment variable validation
 console.log('🔧 SERVER: Checking environment variables...');
 console.log('🔧 SERVER: MONGODB_URI:', process.env.MONGODB_URI ? 'SET' : 'NOT_SET');

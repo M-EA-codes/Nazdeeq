@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import config from '../../config'; // <-- Fix import to use your JS config file
 import { FontAwesome5 } from '@expo/vector-icons';
+import ProfileImage from '@/components/ProfileImage';
+import api from '../api';
 
 interface Activity {
   id: number;
@@ -54,7 +56,8 @@ export default function HomeScreen() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
   const [greeting, setGreeting] = useState('');
-
+  const [dashboardPayload, setDashboardPayload] = useState<any>(null);
+  
   useEffect(() => {
     // Set greeting based on time of day
     const hours = new Date().getHours();
@@ -62,49 +65,31 @@ export default function HomeScreen() {
     else if (hours < 18) setGreeting('Good Afternoon');
     else setGreeting('Good Evening');
 
-    // Load user data and preferences
+    // Load user data and preferences dynamically
     const loadUserData = async () => {
       try {
         const token = await AsyncStorage.getItem('userToken');
         const prefsString = await AsyncStorage.getItem('userPreferences');
-        let userId = await AsyncStorage.getItem('userId');
-        if (!token) {
+        const userId = await AsyncStorage.getItem('userId');
+        if (!token || !userId) {
           router.replace('/(auth)/welcome');
           return;
         }
 
-        // Fetch real user data from backend
-        let realUserData: any = null;
-        if (userId && token) {
-          try {
-            const res = await fetch(`${config.API_URL}/users/${userId}`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            if (res.ok) {
-              realUserData = await res.json();
-            }
-          } catch { }
-        }
+        const res = await api.get('/home-dashboard', {
+          params: { userId },
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
-        // Use real user data if available, otherwise fallback to mock
+        const payload = res.data;
+        setDashboardPayload(payload?.dashboard || {});
         setUserData({
-          name: realUserData?.fullName || 'User',
-          location: realUserData?.address || 'Islamabad',
-          trustScore: realUserData?.trustScore ?? 75,
-          profilePicture: realUserData?.profilePhoto || null,
-          recentActivities: [
-            { id: 1, type: 'ride', message: 'Ali is offering a ride tomorrow at 8 AM – Join now!', icon: 'car.fill' },
-            { id: 2, type: 'service', message: 'Your booked technician for electrical repair is arriving today at 3 PM.', icon: 'wrench.fill' },
-            { id: 3, type: 'event', message: 'New meetup: Chess Club gathering at Central Café on Saturday.', icon: 'person.2.fill' }
-          ],
-          suggestions: [
-            { id: 1, message: 'Since you often book rides in the morning, pre-schedule your next commute now!', icon: 'clock' },
-            { id: 2, message: 'You liked gardening discussions – Join a local gardening meetup this weekend!', icon: 'leaf' },
-            { id: 3, message: 'A neighbor nearby needs plumbing help – Offer assistance?', icon: 'hand.raised' }
-          ]
+          name: payload?.user?.name || 'User',
+          location: payload?.user?.location || 'Unknown',
+          trustScore: payload?.user?.trustScore ?? 0,
+          profilePicture: payload?.user?.profilePhoto || null,
+          recentActivities: payload?.dashboard?.recentActivities || [],
+          suggestions: payload?.dashboard?.suggestions || []
         });
 
         if (prefsString) {
@@ -121,6 +106,9 @@ export default function HomeScreen() {
 
     loadUserData();
   }, []);
+  
+  const recentActivities = dashboardPayload?.recentActivities || userData?.recentActivities || [];
+  const suggestions = dashboardPayload?.suggestions || userData?.suggestions || [];
 
   if (loading) {
     return (
@@ -182,7 +170,7 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.quickActionButton}
-            onPress={() => router.replace('/community')}
+            onPress={() => router.replace('/community/Dashboard' as any)}
           >
             <FontAwesome5 name="users-cog" size={24} color="#fff" />
             {/* If using FontAwesomeIcon and faUsersGear: */}
@@ -201,7 +189,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.card}>
-            {userData?.recentActivities?.map((activity) => (
+            {recentActivities.map((activity: any) => (
               <View key={activity.id} style={styles.notificationItem}>
                 <IconSymbol name={'house.fill' as const} size={24} color="#4c669f" />
                 <ThemedText style={styles.notificationText}>{activity.message}</ThemedText>
@@ -254,7 +242,7 @@ export default function HomeScreen() {
           <ThemedText style={styles.sectionTitle}>Suggested For You</ThemedText>
 
           <View style={styles.card}>
-            {userData?.suggestions?.map((suggestion) => (
+            {suggestions.map((suggestion: any) => (
               <TouchableOpacity key={suggestion.id} style={styles.suggestionItem}>
                 <IconSymbol name={'house.fill' as const} size={24} color="#4c669f" />
                 <ThemedText style={styles.suggestionText}>{suggestion.message}</ThemedText>

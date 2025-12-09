@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, TextInput, Switch, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, TouchableOpacity, TextInput, Switch, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -7,6 +7,8 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import config from '@/config';
+import * as Location from 'expo-location';
+import MapView, { Marker } from 'react-native-maps';
 
 const API_URL = config.API_URL;
 
@@ -28,10 +30,44 @@ export default function OnboardingScreen() {
   });
   
   const [location, setLocation] = useState('');
+  const [coords, setCoords] = useState({
+    latitude: 33.6844,
+    longitude: 73.0479
+  });
+  const [address, setAddress] = useState('');
+  const [loadingLocation, setLoadingLocation] = useState(false);
   const [connectNearby, setConnectNearby] = useState(true);
   
   type InterestKey = keyof typeof interests;
   type ContributionKey = keyof typeof contributions;
+
+  useEffect(() => {
+    // Request location permission when component mounts
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        try {
+          let location = await Location.getCurrentPositionAsync({});
+          setCoords({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude
+          });
+          // Get address from coordinates
+          let geo = await Location.reverseGeocodeAsync({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude
+          });
+          if (geo[0]) {
+            const addr = `${geo[0].street || ''}, ${geo[0].city || ''}, ${geo[0].region || ''}`.trim();
+            setAddress(addr);
+            setLocation(addr);
+          }
+        } catch (error) {
+          console.log('Error getting location:', error);
+        }
+      }
+    })();
+  }, []);
   
   const handleInterestToggle = (interest: InterestKey) => {
     setInterests(prev => ({
@@ -61,12 +97,65 @@ export default function OnboardingScreen() {
     }
   };
   
+  const handleMapPress = async (e: any) => {
+    const { latitude, longitude } = e.nativeEvent.coordinate;
+    setLoadingLocation(true);
+    setCoords({ latitude, longitude });
+    
+    try {
+      let geo = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (geo[0]) {
+        const addr = `${geo[0].street || ''}, ${geo[0].city || ''}, ${geo[0].region || ''}`.trim();
+        setAddress(addr);
+        setLocation(addr);
+      }
+    } catch (error) {
+      console.log('Error reverse geocoding:', error);
+    } finally {
+      setLoadingLocation(false);
+    }
+  };
+
+  const getCurrentLocation = async () => {
+    setLoadingLocation(true);
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please enable location permissions to use this feature.');
+        setLoadingLocation(false);
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      setCoords({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      });
+
+      let geo = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      });
+      if (geo[0]) {
+        const addr = `${geo[0].street || ''}, ${geo[0].city || ''}, ${geo[0].region || ''}`.trim();
+        setAddress(addr);
+        setLocation(addr);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to get current location');
+      console.log('Error getting location:', error);
+    } finally {
+      setLoadingLocation(false);
+    }
+  };
+
   const savePreferencesAndContinue = async () => {
     try {
-      // Get the user token
+      // Get the user token and userId
       const userToken = await AsyncStorage.getItem('userToken');
+      const userId = await AsyncStorage.getItem('userId');
       
-      if (!userToken) {
+      if (!userToken || !userId) {
         Alert.alert('Error', 'Authentication token not found');
         return;
       }
@@ -75,17 +164,36 @@ export default function OnboardingScreen() {
       const userPreferences = {
         interests,
         contributions,
-        location,
+        location: {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          address: address || location
+        },
         connectNearby,
         isFirstLogin: false // Mark that user has completed onboarding
       };
       
       await AsyncStorage.setItem('userPreferences', JSON.stringify(userPreferences));
       
-      // TODO: Send preferences to server when API is ready
-      // const response = await axios.post(`${API_URL}/user/preferences`, userPreferences, {
-      //   headers: { Authorization: `Bearer ${userToken}` }
-      // });
+      // Send preferences to server
+      try {
+        await axios.post(`${API_URL}/users/preferences`, {
+          userId,
+          interests,
+          contributions,
+          location: {
+            type: 'Point',
+            coordinates: [coords.longitude, coords.latitude],
+            address: address || location
+          },
+          connectNearby
+        }, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+      } catch (serverError) {
+        console.log('Error saving to server:', serverError);
+        // Continue even if server save fails
+      }
       
       // Navigate to the main dashboard
       router.replace('/(tabs)/home');
@@ -188,22 +296,49 @@ export default function OnboardingScreen() {
       case 3:
         return (
           <View style={styles.stepContainer}>
-            <ThemedText style={styles.stepTitle}>Where do you live?</ThemedText>
-            <View style={styles.locationContainer}>
-              <TextInput
-                style={styles.locationInput}
-                placeholder="Enter your location"
-                value={location}
-                onChangeText={setLocation}
-                placeholderTextColor="#666"
-              />
-              <TouchableOpacity style={styles.locationButton}>
-                <IconSymbol name="house.fill" size={24} color="#fff" />
+            <ThemedText style={styles.stepTitle}>Pin your home location</ThemedText>
+            <ThemedText style={styles.stepSubtitle}>
+              Tap on the map or use current location to set your neighborhood
+            </ThemedText>
+            
+            <View style={styles.mapContainer}>
+              <MapView
+                style={styles.map}
+                region={{
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01
+                }}
+                onPress={handleMapPress}
+              >
+                <Marker coordinate={coords} title="Your Location" />
+              </MapView>
+              
+              <TouchableOpacity 
+                style={styles.currentLocationButton}
+                onPress={getCurrentLocation}
+                disabled={loadingLocation}
+              >
+                {loadingLocation ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <IconSymbol name="location.fill" size={24} color="#fff" />
+                )}
               </TouchableOpacity>
             </View>
             
+            <View style={styles.addressDisplay}>
+              <IconSymbol name="mappin.circle.fill" size={20} color="#4c669f" />
+              <ThemedText style={styles.addressText}>
+                {address || location || "Tap on the map to set your location"}
+              </ThemedText>
+            </View>
+            
             <View style={styles.switchContainer}>
-              <ThemedText style={styles.switchLabel}>Connect with people from nearby areas?</ThemedText>
+              <ThemedText style={styles.switchLabel}>
+                Connect with people from nearby areas?
+              </ThemedText>
               <Switch
                 value={connectNearby}
                 onValueChange={setConnectNearby}
@@ -335,7 +470,53 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 20,
+    marginBottom: 8,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.8,
+    marginBottom: 16,
+  },
+  mapContainer: {
+    position: 'relative',
+    marginBottom: 16,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  map: {
+    width: '100%',
+    height: 250,
+  },
+  currentLocationButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: '#4c669f',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  addressDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  addressText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
   },
   optionsContainer: {
     gap: 10,
