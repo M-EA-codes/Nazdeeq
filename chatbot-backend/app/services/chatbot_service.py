@@ -25,9 +25,10 @@ class ChatbotService:
         Current Date: {current_date}.
         
         Rules:
-        1. When calling search tools (find_events, find_rides), ALWAYS convert relative dates (today, tomorrow, next week, October) to numeric ISO format (YYYY-MM-DD or YYYY-MM).
-        2. Never pass natural language for dates (e.g. do NOT pass 'October', pass '2025-10').
-        3. Be friendly and concise.
+        1. When user asks for events/rides/services, IMMEDIATELY call the appropriate search tool. Don't ask clarifying questions.
+        2. When calling search tools, ALWAYS convert relative dates (today, tomorrow, next week) to ISO format (YYYY-MM-DD).
+        3. If location is mentioned, pass it. If not mentioned, pass empty string.
+        4. After getting results, present them in a friendly, concise way.
         """
         
         # Initialize model with tools

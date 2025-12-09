@@ -27,8 +27,8 @@ class QueryGenerator:
                     ]
                 })
             elif intent == "events":
-                 # Events store location as an object with an address field
-                 query["location.address"] = {"$regex": params["location"], "$options": "i"}
+                # Events store location as an object with an address field
+                and_conditions.append({"location.address": {"$regex": params["location"], "$options": "i"}})
             else:
                 # Default behavior
                 query["location"] = {"$regex": params["location"], "$options": "i"}
@@ -49,12 +49,17 @@ class QueryGenerator:
         
         # Combine conditions
         if and_conditions:
-            if len(and_conditions) == 1:
-                # If only one complex condition, merge it into top level if possible
-                # (Matches keys like $or)
-                query.update(and_conditions[0])
+            # Always use $and to combine with other query conditions
+            if query:
+                # If there are already conditions in query, combine them
+                final_conditions = [{k: v} for k, v in query.items()]
+                final_conditions.extend(and_conditions)
+                query = {"$and": final_conditions}
+            elif len(and_conditions) == 1:
+                # If only one condition and no other query params, use it directly
+                query = and_conditions[0]
             else:
-                # If multiple complex conditions (e.g. location OR... AND keywords OR...), use $and
+                # Multiple conditions, use $and
                 query["$and"] = and_conditions
         
         return query
