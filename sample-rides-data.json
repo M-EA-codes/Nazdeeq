@@ -1,0 +1,194 @@
+[
+  {
+    "driverId": "684dd7aa8a91249f11a20d16",
+    "passengerIds": [],
+    "origin": {
+      "address": "Blue Area, Islamabad",
+      "coordinates": [33.7077, 73.0563]
+    },
+    "destination": {
+      "address": "F-8 Markaz, Islamabad",
+      "coordinates": [33.6973, 73.0515]
+    },
+    "dateTime": "2025-01-20T08:30:00.000Z",
+    "seatsAvailable": 3,
+    "fare": 150,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d17",
+    "passengerIds": ["684dd7aa8a91249f11a20d18"],
+    "origin": {
+      "address": "Saddar, Rawalpindi",
+      "coordinates": [33.5651, 73.0169]
+    },
+    "destination": {
+      "address": "Islamabad Airport",
+      "coordinates": [33.6149, 72.9906]
+    },
+    "dateTime": "2025-01-20T14:00:00.000Z",
+    "seatsAvailable": 2,
+    "fare": 300,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d19",
+    "passengerIds": [],
+    "origin": {
+      "address": "Centaurus Mall, Islamabad",
+      "coordinates": [33.7215, 73.0433]
+    },
+    "destination": {
+      "address": "Quaid-e-Azam University",
+      "coordinates": [33.6518, 73.1597]
+    },
+    "dateTime": "2025-01-21T09:15:00.000Z",
+    "seatsAvailable": 4,
+    "fare": 200,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d20",
+    "passengerIds": ["684dd7aa8a91249f11a20d21", "684dd7aa8a91249f11a20d22"],
+    "origin": {
+      "address": "Committee Chowk, Rawalpindi",
+      "coordinates": [33.5651, 73.0169]
+    },
+    "destination": {
+      "address": "Pakistan Institute of Medical Sciences",
+      "coordinates": [33.7215, 73.0433]
+    },
+    "dateTime": "2025-01-21T16:45:00.000Z",
+    "seatsAvailable": 1,
+    "fare": 180,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d23",
+    "passengerIds": [],
+    "origin": {
+      "address": "Saidpur Village, Islamabad",
+      "coordinates": [33.7324, 72.8206]
+    },
+    "destination": {
+      "address": "Blue Area, Islamabad",
+      "coordinates": [33.7077, 73.0563]
+    },
+    "dateTime": "2025-01-22T07:00:00.000Z",
+    "seatsAvailable": 2,
+    "fare": 120,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d24",
+    "passengerIds": ["684dd7aa8a91249f11a20d25"],
+    "origin": {
+      "address": "Benazir Bhutto Hospital, Rawalpindi",
+      "coordinates": [33.5651, 73.0169]
+    },
+    "destination": {
+      "address": "F-8 Markaz, Islamabad",
+      "coordinates": [33.6973, 73.0515]
+    },
+    "dateTime": "2025-01-22T11:30:00.000Z",
+    "seatsAvailable": 3,
+    "fare": 250,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d26",
+    "passengerIds": [],
+    "origin": {
+      "address": "F-8 Markaz, Islamabad",
+      "coordinates": [33.6973, 73.0515]
+    },
+    "destination": {
+      "address": "Centaurus Mall, Islamabad",
+      "coordinates": [33.7215, 73.0433]
+    },
+    "dateTime": "2025-01-23T13:15:00.000Z",
+    "seatsAvailable": 4,
+    "fare": 100,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d27",
+    "passengerIds": ["684dd7aa8a91249f11a20d28", "684dd7aa8a91249f11a20d29"],
+    "origin": {
+      "address": "Islamabad Airport",
+      "coordinates": [33.6149, 72.9906]
+    },
+    "destination": {
+      "address": "Blue Area, Islamabad",
+      "coordinates": [33.7077, 73.0563]
+    },
+    "dateTime": "2025-01-23T18:00:00.000Z",
+    "seatsAvailable": 1,
+    "fare": 350,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d30",
+    "passengerIds": [],
+    "origin": {
+      "address": "Quaid-e-Azam University",
+      "coordinates": [33.6518, 73.1597]
+    },
+    "destination": {
+      "address": "Saddar, Rawalpindi",
+      "coordinates": [33.5651, 73.0169]
+    },
+    "dateTime": "2025-01-24T08:45:00.000Z",
+    "seatsAvailable": 3,
+    "fare": 280,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d31",
+    "passengerIds": ["684dd7aa8a91249f11a20d32"],
+    "origin": {
+      "address": "Pakistan Institute of Medical Sciences",
+      "coordinates": [33.7215, 73.0433]
+    },
+    "destination": {
+      "address": "Saidpur Village, Islamabad",
+      "coordinates": [33.7324, 72.8206]
+    },
+    "dateTime": "2025-01-24T15:20:00.000Z",
+    "seatsAvailable": 2,
+    "fare": 160,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d33",
+    "passengerIds": [],
+    "origin": {
+      "address": "Blue Area, Islamabad",
+      "coordinates": [33.7077, 73.0563]
+    },
+    "destination": {
+      "address": "Committee Chowk, Rawalpindi",
+      "coordinates": [33.5651, 73.0169]
+    },
+    "dateTime": "2025-01-25T10:00:00.000Z",
+    "seatsAvailable": 4,
+    "fare": 220,
+    "status": "open"
+  },
+  {
+    "driverId": "684dd7aa8a91249f11a20d34",
+    "passengerIds": ["684dd7aa8a91249f11a20d35", "684dd7aa8a91249f11a20d36"],
+    "origin": {
+      "address": "Centaurus Mall, Islamabad",
+      "coordinates": [33.7215, 73.0433]
+    },
+    "destination": {
+      "address": "Benazir Bhutto Hospital, Rawalpindi",
+      "coordinates": [33.5651, 73.0169]
+    },
+    "dateTime": "2025-01-25T17:30:00.000Z",
+    "seatsAvailable": 1,
+    "fare": 300,
+    "status": "open"
+  }
+]
