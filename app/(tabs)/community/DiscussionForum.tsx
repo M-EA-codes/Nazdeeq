@@ -14,6 +14,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useNavigation } from '@react-navigation/native';
+
+type CommunityStackParamList = {
+  CommunityDashboard: undefined;
+  DiscussionForum: undefined;
+  CreateDiscussion: undefined;
+  DiscussionDetail: { id: string };
+  PollsSection: undefined;
+  CreatePoll: undefined;
+  PollDetail: { id: string };
+};
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -31,19 +42,20 @@ interface Discussion {
   downvotes: string[];
   commentCount: number;
   viewCount: number;
-  created_at: string;
+  createdAt: string;
   isResolved: boolean;
   isPinned: boolean;
   tags: string[];
 }
 
-export default function DiscussionForum({ navigation }: { navigation: any }) {
+export default function DiscussionForum() {
+  const navigation = useNavigation<any>();
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [sortBy, setSortBy] = useState('created_at');
+  const [sortBy, setSortBy] = useState('createdAt');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -58,7 +70,7 @@ export default function DiscussionForum({ navigation }: { navigation: any }) {
   ];
 
   const sortOptions = [
-    { id: 'created_at', name: 'Latest' },
+    { id: 'createdAt', name: 'Latest' },
     { id: 'votes', name: 'Most Voted' },
     { id: 'viewCount', name: 'Most Viewed' },
     { id: 'commentCount', name: 'Most Discussed' }
@@ -106,18 +118,12 @@ export default function DiscussionForum({ navigation }: { navigation: any }) {
       const response = await api.get(`/discussions?${params.toString()}`);
       console.log('Discussions response:', response);
       
-      // Handle different response structures
+      // Handle response structure
       let data = [];
-      if (Array.isArray(response)) {
-        data = response;
-      } else if (response && response.discussions && Array.isArray(response.discussions)) {
+      if (response && response.discussions && Array.isArray(response.discussions)) {
         data = response.discussions;
-      } else if (response && response.data) {
-        if (Array.isArray(response.data)) {
-          data = response.data;
-        } else if (response.data.discussions) {
-          data = response.data.discussions;
-        }
+      } else if (Array.isArray(response)) {
+        data = response;
       }
       
       setDiscussions(data);
@@ -178,7 +184,10 @@ export default function DiscussionForum({ navigation }: { navigation: any }) {
     return (
       <TouchableOpacity
         style={styles.discussionCard}
-        onPress={() => navigation.navigate('DiscussionDetail', { discussionId: item._id })}
+        onPress={() => {
+          console.log('Navigating to discussion detail with ID:', item._id);
+          navigation.navigate('DiscussionDetail', { id: item._id });
+        }}
       >
         <View style={styles.discussionHeader}>
           <View style={styles.discussionMeta}>
@@ -192,7 +201,7 @@ export default function DiscussionForum({ navigation }: { navigation: any }) {
               <MaterialIcons name="check-circle" size={16} color="#4ECDC4" style={styles.resolvedIcon} />
             )}
           </View>
-          <ThemedText style={styles.timeAgo}>{getTimeAgo(item.created_at)}</ThemedText>
+          <ThemedText style={styles.timeAgo}>{getTimeAgo(item.createdAt)}</ThemedText>
         </View>
 
         <ThemedText style={styles.discussionTitle}>{item.title}</ThemedText>

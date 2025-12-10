@@ -12,8 +12,11 @@ import {
   limit,
   Timestamp,
   DocumentData,
+  enableNetwork,
+  disableNetwork,
 } from 'firebase/firestore';
 import { db } from '../app/firebase/config';
+import NetInfo from '@react-native-community/netinfo';
 
 export interface Message {
   id: string;
@@ -47,6 +50,50 @@ export interface Conversation {
 }
 
 class FirebaseMessagingService {
+  private retryCount = 0;
+  private maxRetries = 3;
+  private isOnline = true;
+
+  constructor() {
+    // Monitor network status
+    NetInfo.addEventListener(state => {
+      this.isOnline = state.isConnected ?? false;
+      console.log('🌐 Network status changed:', this.isOnline ? 'Online' : 'Offline');
+      
+      if (this.isOnline) {
+        enableNetwork(db);
+      } else {
+        disableNetwork(db);
+      }
+    });
+  }
+
+  // Retry mechanism for Firebase operations
+  private async withRetry<T>(operation: () => Promise<T>, operationName: string): Promise<T> {
+    if (!this.isOnline) {
+      throw new Error('No internet connection');
+    }
+
+    try {
+      const result = await operation();
+      this.retryCount = 0; // Reset on success
+      return result;
+    } catch (error) {
+      this.retryCount++;
+      console.warn(`⚠️ ${operationName} failed (attempt ${this.retryCount}/${this.maxRetries}):`, error);
+      
+      if (this.retryCount < this.maxRetries && this.isOnline) {
+        // Exponential backoff
+        const delay = Math.pow(2, this.retryCount) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.withRetry(operation, operationName);
+      } else {
+        this.retryCount = 0;
+        throw error;
+      }
+    }
+  }
+
   // Get or create conversation between two users
   async getOrCreateConversation(
     userId1: string,
@@ -54,7 +101,7 @@ class FirebaseMessagingService {
     user1Details: { name: string; photo?: string },
     user2Details: { name: string; photo?: string }
   ): Promise<string> {
-    try {
+    return this.withRetry(async () => {
       console.log('🔍 Checking for existing conversation between:', userId1, 'and', userId2);
       
       // Sort user IDs to ensure consistent ordering
@@ -108,10 +155,7 @@ class FirebaseMessagingService {
       const docRef = await addDoc(conversationsRef, newConversation);
       console.log('✅ New conversation created:', docRef.id);
       return docRef.id;
-    } catch (error) {
-      console.error('❌ Error creating conversation:', error);
-      throw error;
-    }
+    }, 'getOrCreateConversation');
   }
 
   // Send a message
@@ -184,6 +228,8 @@ class FirebaseMessagingService {
       },
       (error) => {
         console.error('❌ Error listening to messages:', error);
+        // Provide fallback empty array to prevent crashes
+        callback([]);
       }
     );
 
@@ -222,6 +268,8 @@ class FirebaseMessagingService {
       },
       (error) => {
         console.error('❌ Error listening to conversations:', error);
+        // Provide fallback empty array to prevent crashes
+        callback([]);
       }
     );
 

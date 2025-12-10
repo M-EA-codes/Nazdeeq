@@ -25,8 +25,8 @@ export default function BookingList({ route }: { route: any }) {
       // Fetch bookings from backend
       const userId = route?.params?.userId || '';
       const url = type === 'provider'
-        ? `http://localhost:5000/api/service-requests?providerId=${userId}`
-        : `http://localhost:5000/api/service-requests?seekerId=${userId}`;
+        ? `http://10.215.128.153:5000/api/service-requests?providerId=${userId}`
+        : `http://10.215.128.153:5000/api/service-requests?requesterId=${userId}`;
       try {
         const res = await fetch(url);
         const data = await res.json();

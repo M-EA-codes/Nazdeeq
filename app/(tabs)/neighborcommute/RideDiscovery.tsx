@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -13,14 +13,16 @@ import {
   Alert,
   RefreshControl,
   Dimensions,
-  Linking 
+  Linking,
+  Modal,
+  ScrollView
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Location from 'expo-location';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import ProfileImage from '@/components/ProfileImage';
 
 const { width } = Dimensions.get('window');
 
@@ -52,6 +54,18 @@ interface Ride {
   passengerIds?: string[];
 }
 
+interface LocationSuggestion {
+  place_id: string;
+  description: string;
+  formatted_address: string;
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
+    };
+  };
+}
+
 export default function RideDiscovery() {
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
@@ -62,11 +76,23 @@ export default function RideDiscovery() {
   const [rides, setRides] = useState<Ride[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  
+  // Geocoding and location states
+  const [pickupSuggestions, setPickupSuggestions] = useState<LocationSuggestion[]>([]);
+  const [dropoffSuggestions, setDropoffSuggestions] = useState<LocationSuggestion[]>([]);
+  const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
+  const [showDropoffSuggestions, setShowDropoffSuggestions] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [selectedRide, setSelectedRide] = useState<Ride | null>(null);
+  const [showRideDetails, setShowRideDetails] = useState(false);
+  
+  const pickupInputRef = useRef<TextInput>(null);
+  const dropoffInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     fetchUserData();
     fetchRides();
+    requestLocationPermission();
   }, []);
 
   const fetchUserData = async () => {
@@ -81,6 +107,126 @@ export default function RideDiscovery() {
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+    }
+  };
+
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const location = await Location.getCurrentPositionAsync({});
+        setCurrentLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      }
+    } catch (error) {
+      console.error('Error getting location:', error);
+    }
+  };
+
+  const searchPlaces = async (query: string, type: 'pickup' | 'dropoff') => {
+    if (query.length < 3) {
+      if (type === 'pickup') {
+        setPickupSuggestions([]);
+        setShowPickupSuggestions(false);
+      } else {
+        setDropoffSuggestions([]);
+        setShowDropoffSuggestions(false);
+      }
+      return;
+    }
+
+    try {
+      // Using Google Places API for autocomplete
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=YOUR_GOOGLE_PLACES_API_KEY&types=geocode`
+      );
+      const data = await response.json();
+      
+      if (data.predictions) {
+        const suggestions = data.predictions.map((prediction: any) => ({
+          place_id: prediction.place_id,
+          description: prediction.description,
+          formatted_address: prediction.description,
+          geometry: {
+            location: {
+              lat: 0, // Will be fetched separately
+              lng: 0
+            }
+          }
+        }));
+
+        if (type === 'pickup') {
+          setPickupSuggestions(suggestions);
+          setShowPickupSuggestions(true);
+        } else {
+          setDropoffSuggestions(suggestions);
+          setShowDropoffSuggestions(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error searching places:', error);
+      // Fallback to mock suggestions for demo
+      const mockSuggestions = [
+        {
+          place_id: '1',
+          description: `${query} - San Francisco, CA`,
+          formatted_address: `${query} - San Francisco, CA`,
+          geometry: {
+            location: { lat: 37.7749, lng: -122.4194 }
+          }
+        }
+      ];
+      
+      if (type === 'pickup') {
+        setPickupSuggestions(mockSuggestions);
+        setShowPickupSuggestions(true);
+      } else {
+        setDropoffSuggestions(mockSuggestions);
+        setShowDropoffSuggestions(true);
+      }
+    }
+  };
+
+  const selectLocation = (suggestion: LocationSuggestion, type: 'pickup' | 'dropoff') => {
+    if (type === 'pickup') {
+      setPickup(suggestion.description);
+      setShowPickupSuggestions(false);
+      setPickupSuggestions([]);
+    } else {
+      setDropoff(suggestion.description);
+      setShowDropoffSuggestions(false);
+      setDropoffSuggestions([]);
+    }
+  };
+
+  const getCurrentLocation = async (type: 'pickup' | 'dropoff') => {
+    try {
+      const { status} = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const location = await Location.getCurrentPositionAsync({});
+        const reverseGeocode = await Location.reverseGeocodeAsync({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+        
+        if (reverseGeocode.length > 0) {
+          const address = reverseGeocode[0];
+          const formattedAddress = `${address.street || ''} ${address.city || ''} ${address.region || ''}`.trim();
+          
+          if (type === 'pickup') {
+            setPickup(formattedAddress);
+            setShowPickupSuggestions(false);
+          } else {
+            setDropoff(formattedAddress);
+            setShowDropoffSuggestions(false);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error getting current location:', error);
+      Alert.alert('Error', 'Could not get your current location');
     }
   };
 
@@ -106,12 +252,43 @@ export default function RideDiscovery() {
       }
 
       console.log('Fetching rides with params:', params);
-      const response = await api.get('/rides', { params });
+      const queryString = new URLSearchParams(params).toString();
+      const response = await api.get(`/rides?${queryString}`);
+      console.log('Raw API response:', response);
+      console.log('Response length:', response?.length);
       
-      // Filter out current user's rides on frontend as well
-      const availableRides = response.data.filter((ride: Ride) => 
-        ride.driverId._id !== userId && ride.seatsAvailable > 0
-      );
+      // Ensure response is an array
+      if (!Array.isArray(response)) {
+        console.error('API response is not an array:', response);
+        setRides([]);
+        return;
+      }
+      
+      // Filter out current user's rides and ensure uniqueness
+      const filteredRides = response.filter((ride: Ride) => {
+        const driverId = ride.driverId._id || ride.driverId;
+        const isNotUserRide = driverId !== userId;
+        const hasAvailableSeats = ride.seatsAvailable > 0;
+        console.log('Ride filter check:', {
+          rideId: ride._id,
+          driverId,
+          userId,
+          isNotUserRide,
+          hasAvailableSeats,
+          seatsAvailable: ride.seatsAvailable
+        });
+        return isNotUserRide && hasAvailableSeats;
+      });
+      
+      // Remove duplicates by creating a Map with unique IDs
+      const uniqueRidesMap = new Map();
+      filteredRides.forEach((ride: Ride) => {
+        uniqueRidesMap.set(ride._id, ride);
+      });
+      
+      const availableRides = Array.from(uniqueRidesMap.values());
+      console.log('Filtered and deduplicated rides:', availableRides.length);
+      console.log('Ride IDs:', availableRides.map(ride => ride._id));
       
       setRides(availableRides);
     } catch (error) {
@@ -136,6 +313,11 @@ export default function RideDiscovery() {
     }
     
     await fetchRides(searchParams);
+  };
+
+  const onRidePress = (ride: Ride) => {
+    setSelectedRide(ride);
+    setShowRideDetails(true);
   };
 
   const clearSearch = () => {
@@ -240,22 +422,22 @@ export default function RideDiscovery() {
 
   const renderRide = ({ item }: { item: Ride }) => {
     const seatsTaken = (item.totalSeats || item.seatsAvailable + 1) - item.seatsAvailable;
+    const profileImage = item.driverId.profilePhoto || generateUniqueProfileImages(item.driverId._id);
     
     return (
-      <LinearGradient
-        colors={["#fff", "#f8f9ff"]}
-        style={styles.rideCard}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      <TouchableOpacity onPress={() => onRidePress(item)} activeOpacity={0.9}>
+        <LinearGradient
+          colors={["#fff", "#f8f9ff"]}
+          style={styles.rideCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
         <View style={styles.rideHeader}>
           <View style={styles.driverInfo}>
-            <ProfileImage
-              source={item.driverId.profilePhoto}
-              userId={item.driverId._id}
-              userName={item.driverId.fullName}
-              size={48}
+            <Image 
+              source={{ uri: profileImage }} 
               style={styles.profilePic}
+              defaultSource={{ uri: getDefaultProfileImage() }}
             />
             <View style={styles.driverDetails}>
               <Text style={styles.driverName}>
@@ -342,45 +524,10 @@ export default function RideDiscovery() {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+      </TouchableOpacity>
     );
   };
 
-  const renderMapPlaceholder = () => (
-    <View style={styles.mapPlaceholder}>
-      <MaterialIcons name="map" size={64} color="rgba(255,255,255,0.3)" />
-      <Text style={styles.mapPlaceholderText}>Map View</Text>
-      <Text style={styles.mapPlaceholderSubtext}>
-        Tap "Route" on any ride card to view directions
-      </Text>
-      
-      <View style={styles.ridesMapContainer}>
-        {rides.slice(0, 3).map((ride, index) => (
-          <TouchableOpacity 
-            key={ride._id}
-            style={styles.mapRideItem}
-            onPress={() => openInMaps(ride.origin.name, ride.destination.name)}
-          >
-            <View style={styles.mapRideHeader}>
-              <MaterialIcons name="place" size={20} color="#4b32c3" />
-              <Text style={styles.mapRideTitle} numberOfLines={1}>
-                {ride.origin.name} → {ride.destination.name}
-              </Text>
-            </View>
-            <Text style={styles.mapRideDriver}>{ride.driverId.fullName}</Text>
-            <Text style={styles.mapRideFare}>
-              {ride.fare > 0 ? `$${ride.fare}` : 'FREE'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        
-        {rides.length > 3 && (
-          <Text style={styles.moreRidesText}>
-            +{rides.length - 3} more rides
-          </Text>
-        )}
-      </View>
-    </View>
-  );
 
   return (
     <LinearGradient colors={["#6a11cb", "#2575fc"]} style={styles.gradient}>
@@ -400,26 +547,90 @@ export default function RideDiscovery() {
             <View style={styles.inputContainer}>
               <MaterialIcons name="radio-button-checked" size={20} color="#3ad29f" />
               <TextInput 
+                ref={pickupInputRef}
                 style={styles.input} 
                 placeholder="From where?" 
                 placeholderTextColor="#999" 
                 value={pickup} 
-                onChangeText={setPickup}
+                onChangeText={(text) => {
+                  setPickup(text);
+                  searchPlaces(text, 'pickup');
+                }}
+                onFocus={() => {
+                  if (pickupSuggestions.length > 0) {
+                    setShowPickupSuggestions(true);
+                  }
+                }}
                 returnKeyType="next"
               />
+              <TouchableOpacity 
+                style={styles.locationButton}
+                onPress={() => getCurrentLocation('pickup')}
+              >
+                <MaterialIcons name="my-location" size={20} color="#3ad29f" />
+              </TouchableOpacity>
             </View>
+            
+            {showPickupSuggestions && pickupSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <ScrollView style={styles.suggestionsList} nestedScrollEnabled>
+                  {pickupSuggestions.map((suggestion) => (
+                    <TouchableOpacity
+                      key={suggestion.place_id}
+                      style={styles.suggestionItem}
+                      onPress={() => selectLocation(suggestion, 'pickup')}
+                    >
+                      <MaterialIcons name="place" size={16} color="#666" />
+                      <Text style={styles.suggestionText}>{suggestion.description}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
             
             <View style={styles.inputContainer}>
               <MaterialIcons name="location-on" size={20} color="#3a8fd2" />
               <TextInput 
+                ref={dropoffInputRef}
                 style={styles.input} 
                 placeholder="Where to?" 
                 placeholderTextColor="#999" 
                 value={dropoff} 
-                onChangeText={setDropoff}
+                onChangeText={(text) => {
+                  setDropoff(text);
+                  searchPlaces(text, 'dropoff');
+                }}
+                onFocus={() => {
+                  if (dropoffSuggestions.length > 0) {
+                    setShowDropoffSuggestions(true);
+                  }
+                }}
                 returnKeyType="next"
               />
+              <TouchableOpacity 
+                style={styles.locationButton}
+                onPress={() => getCurrentLocation('dropoff')}
+              >
+                <MaterialIcons name="my-location" size={20} color="#3a8fd2" />
+              </TouchableOpacity>
             </View>
+            
+            {showDropoffSuggestions && dropoffSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <ScrollView style={styles.suggestionsList} nestedScrollEnabled>
+                  {dropoffSuggestions.map((suggestion) => (
+                    <TouchableOpacity
+                      key={suggestion.place_id}
+                      style={styles.suggestionItem}
+                      onPress={() => selectLocation(suggestion, 'dropoff')}
+                    >
+                      <MaterialIcons name="place" size={16} color="#666" />
+                      <Text style={styles.suggestionText}>{suggestion.description}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             <TouchableOpacity 
               style={styles.inputContainer}
@@ -449,26 +660,6 @@ export default function RideDiscovery() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.viewToggle}>
-              <TouchableOpacity 
-                style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
-                onPress={() => setViewMode('list')}
-              >
-                <MaterialIcons name="list" size={20} color={viewMode === 'list' ? '#fff' : '#666'} />
-                <Text style={[styles.toggleText, viewMode === 'list' && styles.toggleTextActive]}>
-                  List
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.toggleButton, viewMode === 'map' && styles.toggleButtonActive]}
-                onPress={() => setViewMode('map')}
-              >
-                <MaterialIcons name="map" size={20} color={viewMode === 'map' ? '#fff' : '#666'} />
-                <Text style={[styles.toggleText, viewMode === 'map' && styles.toggleTextActive]}>
-                  Map
-                </Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {showDatePicker && (
@@ -486,8 +677,6 @@ export default function RideDiscovery() {
               <ActivityIndicator size="large" color="#fff" />
               <Text style={styles.loadingText}>Finding rides...</Text>
             </View>
-          ) : viewMode === 'map' ? (
-            renderMapPlaceholder()
           ) : (
             <FlatList
               data={rides}
@@ -515,6 +704,126 @@ export default function RideDiscovery() {
           )}
         </View>
       </KeyboardAvoidingView>
+      
+      {/* Ride Details Modal */}
+      <Modal
+        visible={showRideDetails}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowRideDetails(false)}
+      >
+        {selectedRide && (
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Ride Details</Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => setShowRideDetails(false)}
+              >
+                <MaterialIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalContent}>
+              <View style={styles.modalRideCard}>
+                <View style={styles.modalRideHeader}>
+                  <View style={styles.modalDriverInfo}>
+                    <Image 
+                      source={{ uri: selectedRide.driverId.profilePhoto || 'https://via.placeholder.com/48x48/7f53ac/ffffff?text=U' }} 
+                      style={styles.modalProfilePic}
+                    />
+                    <View style={styles.modalDriverDetails}>
+                      <Text style={styles.modalDriverName}>
+                        {selectedRide.driverId.fullName || 'Anonymous Driver'}
+                      </Text>
+                      <View style={styles.modalRatingContainer}>
+                        <MaterialIcons name="star" size={16} color="#ffd93d" />
+                        <Text style={styles.modalRating}>
+                          {(selectedRide.driverId.rating || 4.5).toFixed(1)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.modalFareContainer}>
+                    <Text style={styles.modalFareLabel}>Fare</Text>
+                    <Text style={[styles.modalFareAmount, { color: selectedRide.fare > 0 ? '#4b32c3' : '#3ad29f' }]}>
+                      {selectedRide.fare > 0 ? `$${selectedRide.fare}` : 'FREE'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalRouteContainer}>
+                  <View style={styles.modalLocationRow}>
+                    <MaterialIcons name="radio-button-checked" size={18} color="#3ad29f" />
+                    <Text style={styles.modalLocationText}>{selectedRide.origin.name}</Text>
+                  </View>
+                  <View style={styles.modalRouteLine} />
+                  <View style={styles.modalLocationRow}>
+                    <MaterialIcons name="location-on" size={18} color="#3a8fd2" />
+                    <Text style={styles.modalLocationText}>{selectedRide.destination.name}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalRideDetails}>
+                  <View style={styles.modalDetailItem}>
+                    <MaterialIcons name="schedule" size={16} color="#7f53ac" />
+                    <Text style={styles.modalDetailText}>
+                      {new Date(selectedRide.dateTime).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </Text>
+                  </View>
+                  <View style={styles.modalDetailItem}>
+                    <FontAwesome5 name="users" size={14} color="#3a8fd2" />
+                    <Text style={styles.modalDetailText}>
+                      {selectedRide.seatsAvailable} seats available
+                    </Text>
+                  </View>
+                </View>
+
+                {selectedRide.notes && (
+                  <View style={styles.modalNotesContainer}>
+                    <MaterialIcons name="info-outline" size={16} color="#666" />
+                    <Text style={styles.modalNotesText}>{selectedRide.notes}</Text>
+                  </View>
+                )}
+
+                <View style={styles.modalActionButtons}>
+                  <TouchableOpacity 
+                    style={styles.modalMapButton}
+                    onPress={() => openInMaps(selectedRide.origin.name, selectedRide.destination.name)}
+                  >
+                    <MaterialIcons name="directions" size={18} color="#4b32c3" />
+                    <Text style={styles.modalMapButtonText}>Get Directions</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[
+                      styles.modalJoinButton,
+                      selectedRide.seatsAvailable <= 0 && styles.modalJoinButtonDisabled
+                    ]} 
+                    onPress={() => {
+                      setShowRideDetails(false);
+                      handleJoinRide(selectedRide._id);
+                    }}
+                    disabled={selectedRide.seatsAvailable <= 0}
+                  >
+                    <Text style={styles.modalJoinButtonText}>
+                      {selectedRide.seatsAvailable <= 0 ? 'RIDE FULL' : 'JOIN RIDE'}
+                    </Text>
+                    {selectedRide.seatsAvailable > 0 && (
+                      <MaterialIcons name="arrow-forward" size={18} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        )}
+      </Modal>
     </LinearGradient>
   );
 }
@@ -598,34 +907,6 @@ const styles = StyleSheet.create({
   clearButtonText: {
     color: 'rgba(255,255,255,0.8)',
     fontWeight: '600',
-  },
-  viewToggle: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 25,
-    marginTop: 12,
-    padding: 4,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-    flexDirection: 'row',
-    gap: 6,
-  },
-  toggleButtonActive: {
-    backgroundColor: '#4b32c3',
-  },
-  toggleText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  toggleTextActive: {
-    color: '#fff',
   },
   loadingContainer: {
     flex: 1,
@@ -792,66 +1073,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     letterSpacing: 0.5,
   },
-  mapPlaceholder: {
-    flex: 1,
-    margin: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 20,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapPlaceholderText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  mapPlaceholderSubtext: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  ridesMapContainer: {
-    width: '100%',
-    gap: 12,
-  },
-  mapRideItem: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 12,
-    padding: 16,
-  },
-  mapRideHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  mapRideTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#23235b',
-    marginLeft: 8,
-    flex: 1,
-  },
-  mapRideDriver: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  mapRideFare: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4b32c3',
-  },
-  moreRidesText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    fontWeight: '600',
-    marginTop: 8,
-  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -869,5 +1090,217 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  
+  // Geocoding and suggestions styles
+  locationButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  suggestionsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginTop: 4,
+    marginBottom: 8,
+    maxHeight: 200,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  suggestionsList: {
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: '#333',
+    marginLeft: 8,
+    flex: 1,
+  },
+  
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#23235b',
+  },
+  closeButton: {
+    padding: 8,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  modalRideCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalRideHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalDriverInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  modalProfilePic: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#f0f0f0',
+  },
+  modalDriverDetails: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  modalDriverName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#23235b',
+    marginBottom: 4,
+  },
+  modalRatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  modalRating: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  modalFareContainer: {
+    alignItems: 'flex-end',
+  },
+  modalFareLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  modalFareAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  modalRouteContainer: {
+    marginBottom: 20,
+  },
+  modalLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalLocationText: {
+    fontSize: 16,
+    color: '#23235b',
+    fontWeight: '500',
+    marginLeft: 12,
+    flex: 1,
+  },
+  modalRouteLine: {
+    width: 2,
+    height: 24,
+    backgroundColor: '#ddd',
+    marginLeft: 8,
+    marginVertical: 4,
+  },
+  modalRideDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modalDetailText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  modalNotesContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  modalNotesText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    flex: 1,
+  },
+  modalActionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalMapButton: {
+    backgroundColor: 'rgba(75, 50, 195, 0.1)',
+    borderRadius: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#4b32c3',
+    flex: 1,
+  },
+  modalMapButtonText: {
+    color: '#4b32c3',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  modalJoinButton: {
+    backgroundColor: '#4b32c3',
+    borderRadius: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  modalJoinButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  modalJoinButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    letterSpacing: 0.5,
   },
 });

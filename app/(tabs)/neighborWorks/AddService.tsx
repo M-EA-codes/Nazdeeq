@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import api from '../../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -28,7 +29,8 @@ interface ServiceData {
   requirements?: string;
 }
 
-export default function AddService({ navigation }: { navigation: any }) {
+export default function AddService() {
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [serviceData, setServiceData] = useState<ServiceData>({
@@ -140,6 +142,15 @@ export default function AddService({ navigation }: { navigation: any }) {
       }
 
       await api.post('/services', servicePayload);
+      
+      // Clear form fields after successful submission
+      setServiceData({
+        title: '',
+        description: '',
+        category: '',
+        priceType: 'negotiable',
+        location: '',
+      });
       
       Alert.alert(
         'Success!',

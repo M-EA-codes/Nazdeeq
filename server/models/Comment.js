@@ -15,8 +15,8 @@ const CommentSchema = new Schema({
     reason: String,
     reportedAt: { type: Date, default: Date.now }
   }],
-  created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('Comment', CommentSchema);

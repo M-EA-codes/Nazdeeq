@@ -15,6 +15,11 @@ const serviceRequestRoutes = require('./routes/serviceRequests');
 const neighborWorksRoutes = require('./routes/neighborWorks');
 const vibeTribeRoutes = require('./routes/vibeTribe');
 const connectionRoutes = require('./routes/connections');
+const discussionRoutes = require('./routes/discussions');
+const pollRoutes = require('./routes/polls');
+const eventRoutes = require('./routes/events');
+const groupRoutes = require('./routes/groups');
+const commentRoutes = require('./routes/comments');
 const homeDashboardRoutes = require('./routes/homeDashboard');
 const communityRoutes = require('./routes/community');
 
@@ -197,6 +202,11 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/service-requests', serviceRequestRoutes);
 app.use('/api/vibe-tribe', vibeTribeRoutes);
 app.use('/api/connections', connectionRoutes);
+app.use('/api/discussions', discussionRoutes);
+app.use('/api/polls', pollRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/comments', commentRoutes);
 app.use('/api/home-dashboard', homeDashboardRoutes);
 app.use('/api', communityRoutes);
 // Environment variable validation
@@ -231,3 +241,10 @@ app.listen(PORT, () => {
   console.log('   - Other routes mounted');
   console.log('🚀 SERVER: Ready to accept requests!');
 });
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
+});
+
+module.exports = app;

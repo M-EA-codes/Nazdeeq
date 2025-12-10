@@ -1,35 +1,86 @@
 const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
 
-const PollSchema = new Schema({
-  title: { type: String, required: true },
-  question: { type: String, required: true },
-  options: [{
-    optionId: { type: Number, required: true },
-    text: { type: String, required: true },
-    votes: [{ type: Schema.Types.ObjectId, ref: 'User' }]
-  }],
-  createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  discussionId: { type: Schema.Types.ObjectId, ref: 'Discussion' },
-  category: { 
-    type: String, 
+const pollOptionSchema = new mongoose.Schema({
+  optionId: {
+    type: Number,
+    required: true
+  },
+  text: {
+    type: String,
+    required: true,
+    trim: true,
+    maxLength: 100
+  },
+  votes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
+});
+
+const pollSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+    trim: true,
+    maxLength: 100
+  },
+  question: {
+    type: String,
+    required: true,
+    trim: true,
+    maxLength: 500
+  },
+  category: {
+    type: String,
     enum: ['infrastructure', 'safety', 'environment', 'community', 'government', 'other'],
     default: 'other'
   },
-  isActive: { type: Boolean, default: true },
-  endDate: { type: Date },
-  allowMultipleVotes: { type: Boolean, default: false },
-  isAnonymous: { type: Boolean, default: false },
-  totalVotes: { type: Number, default: 0 },
-  location: { type: String, default: '' },
-  created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  location: {
+    type: String,
+    trim: true
+  },
+  options: [pollOptionSchema],
+  allowMultipleVotes: {
+    type: Boolean,
+    default: false
+  },
+  isAnonymous: {
+    type: Boolean,
+    default: false
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  endDate: {
+    type: Date
+  },
+  totalVotes: {
+    type: Number,
+    default: 0
+  }
+}, {
+  timestamps: true
 });
 
-// Calculate total votes
-PollSchema.pre('save', function(next) {
+// Add virtual for backward compatibility
+pollSchema.virtual('created_at').get(function() {
+  return this.createdAt;
+});
+
+// Ensure virtuals are included when converting to JSON
+pollSchema.set('toJSON', { virtuals: true });
+pollSchema.set('toObject', { virtuals: true });
+
+// Update totalVotes before saving
+pollSchema.pre('save', function(next) {
   this.totalVotes = this.options.reduce((total, option) => total + option.votes.length, 0);
   next();
 });
 
-module.exports = mongoose.model('Poll', PollSchema);
+module.exports = mongoose.model('Poll', pollSchema);

@@ -1,40 +1,19 @@
 import React from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import NeighborCommuteDashboard from './Dashboard';
-import RideDiscovery from './RideDiscovery';
-import RideOffer from './RideOffer';
-import MyRides from './MyRides';
-
-const Stack = createNativeStackNavigator();
+import { Stack } from 'expo-router';
 
 export default function NeighborCommuteLayout() {
   return (
-    <Stack.Navigator 
-      initialRouteName="Dashboard"
+    <Stack
       screenOptions={{
-        headerShown: false
+        headerShown: false,
+        animation: 'slide_from_right',
+        gestureEnabled: true,
       }}
     >
-      <Stack.Screen 
-        name="Dashboard" 
-        component={NeighborCommuteDashboard} 
-        options={{ title: 'Neighbor Commute' }} 
-      />
-      <Stack.Screen 
-        name="RideDiscovery" 
-        component={RideDiscovery} 
-        options={{ title: 'Find Rides' }} 
-      />
-      <Stack.Screen 
-        name="RideOffer" 
-        component={RideOffer} 
-        options={{ title: 'Offer Ride' }} 
-      />
-      <Stack.Screen 
-        name="MyRides" 
-        component={MyRides} 
-        options={{ title: 'My Rides' }} 
-      />
-    </Stack.Navigator>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="RideDiscovery" />
+      <Stack.Screen name="RideOffer" />
+      <Stack.Screen name="MyRides" />
+    </Stack>
   );
 }
